@@ -1,0 +1,1120 @@
+---
+title: "GE_IC_Overall"
+author: "Clarence Sim"
+date: "6/20/2021"
+output: pdf_document
+---
+
+```{r knitr_init, echo=FALSE, cache=FALSE}
+
+library(knitr)
+library(rmdformats)
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               eval = TRUE)
+opts_knit$set(width=75)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+```
+
+# Load various R files (Must be in this order)
+
+```{r, echo=FALSE}
+#Read phyloseq file
+source("../R_ice_camp/GE_IC_common_read_phyloseq.R")
+
+#Adding sample labels, clusters, and organizing the depths.
+source("../R_ice_camp/GE_IC_unsorted_data_organisation.R") #input is ps_unsorted; output is ps
+
+#Trophic mode assignment
+source("../R_ice_camp/GE_IC_common_PR2trophic_allocation.R") 
+# rerun trophic_mode.R separately if there are any updates
+
+#Read color allocation for plots
+source("../R_ice_camp/GE_IC_common_color.R")
+
+#load functions (e.g. treemap, longform, normalize)
+source("../R_ice_camp/GE_IC_common_functions.R")
+
+```
+
+# Split PS into Time Series (TS), Light Stress (LS) [ignore for now]. 
+```{r, message=FALSE }
+#ps_LS <- ps %>% subset_samples(!is.na(experiment_name))
+ps_TS <- ps %>% subset_samples(is.na(experiment_name) & (substrate=="water" | substrate=="ice"))
+
+# Do normalizations and transformation
+ps_TS <- phyloseq_normalize_median(ps_TS)
+long <- phyloseq_transform_to_long(ps_TS)
+
+taxa <- data.frame(tax_table(ps_TS)) %>% rownames_to_column("asv_code") 
+```
+
+
+
+# Arranging the water and ice depths, and size fractions
+```{r fig.height=10, fig.width=18}
+long$fraction_name<-factor(long$fraction_name, levels=c("pico", "nano", "micro"))
+long$trophic_mode<-factor(long$trophic_mode, levels=c("photosynthetic","mixotrophic","dinoflagellata","heterotrophic"))
+long$depth_level<-factor(long$depth_level, levels=c("ICE_1","ICE_0", "WATER_1","WATER_2", "WATER_3", "WATER_4"))
+long$date <- lubridate::ymd(long$date)
+```
+
+# ice and snow plots
+```{r fig.height=10, fig.width=18}
+filepath = "../metadata/GE16_IceSnow_thickness_Icecoring_Site.xlsx"
+ice_thickness <- read_excel("../metadata/GE16_IceSnow_thickness_Icecoring_Site.xlsx", skip=2)
+snow <- select(ice_thickness, `Date`:`Snow (cm)`)
+snow <- cbind(snow, data.frame(rep("Snow", 30)))
+names(snow)[names(snow) == "rep..Snow...30."] <- "type"
+names(snow)[names(snow) == "Snow (cm)"] <- "thickness"
+
+ice <- select(ice_thickness,`Date`,`Ice (cm)`)
+ice <- cbind(ice, data.frame(rep("Ice", 30)))
+names(ice)[names(ice) == "rep..Ice...30."] <- "type"
+names(ice)[names(ice) == "Ice (cm)"] <- "thickness"
+ice$thickness<-ice$thickness*-1 # make the ice below sea level
+ice_snow <- merge(snow,ice, all = TRUE)
+names(ice_snow)[names(ice_snow) == "Date"] <- "date"
+ice_snow$date <-  lubridate::ymd(ice_snow$date)
+ice_snow$type<-factor(ice_snow$type,levels=c("Snow","Ice"))
+
+#adding ice sampling depth as points
+
+ice_samples<-subset(ice_snow, ice_snow$type=="Ice" & as.character(ice_snow$date) %in% c("2016-05-09","2016-05-23","2016-05-30","2016-06-06","2016-06-13","2016-06-20","2016-06-27"))
+ice_samples$depth_level<-"ICE_0"
+ice_samples2<-ice_samples
+ice_samples2$thickness<-ice_samples2$thickness + 10
+ice_samples2$depth_level<-"ICE_1"
+ice_samples<-rbind(ice_samples,ice_samples2)
+
+# bloom stages 1 to 3
+  rect1 <- geom_rect(aes(xmin = as.Date("2016-05-01"), xmax = as.Date("2016-06-03"), 
+                         ymin = -Inf, ymax = Inf), alpha=0.2, fill = "#CCCCCC", color=NA)
+  rect2 <- geom_rect(aes(xmin = as.Date("2016-06-03"), xmax = as.Date("2016-06-15"), 
+                         ymin = -Inf, ymax = Inf), alpha=0.2, fill = "#DDDDDD",color=NA) 
+  rect3 <- geom_rect(aes(xmin = as.Date("2016-06-15"), xmax = as.Date("2016-07-25"), 
+                         ymin = -Inf, ymax = Inf), alpha=0.2, fill = "#EEEEEE",color=NA)
+ 
+
+plot_ice_snow <- ggplot(ice_snow, aes(x = date, y = thickness, fill=type)) + 
+  rect1 + rect2 + rect3 +
+  geom_area() +
+  scale_fill_manual(values = c("Snow" = "#1261A0", "Ice" = "#58cced")) + 
+  xlab("Date") +
+  ylab("Thickness (cm)") +
+  theme_bw() + 
+  labs(group = "type", fill = "type", col = "type")+
+  theme(axis.text=element_text(size=22),
+        axis.title=element_text(size=22),
+        legend.text = element_text(size=24),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+        scale_x_date(limits=c(as.Date("2016-05-01"),as.Date("2016-07-25"))) + 
+  theme(legend.title = element_blank(), legend.position = c(0.90, 0.50),  
+        legend.background = element_rect(fill = NA),
+        legend.key = element_rect(fill = NA)) +
+  geom_point(data=ice_samples, aes(x=date,y=thickness),size=4, color="black",show.legend = FALSE) + 
+  geom_line(data=ice_samples, aes(group=depth_level),color="black") +
+  geom_dl(data=ice_samples,aes(label = depth_level), method = list(dl.trans(x = x + 1), dl.combine("last.points"),cex=1.8)) 
+
+plot_ice_snow
+
+#plot the sampling depths across time
+
+depth_plot<-long%>%group_by(date,substrate,depth,depth_level)%>%summarize(n_reads=sum(n_reads))
+depth_plot$date <- lubridate::ymd(depth_plot$date)
+
+plot_depth <- ggplot(depth_plot,aes(x=date, y=depth)) + 
+  rect1 + rect2 + rect3 +
+  geom_point(size=4,shape="triangle") + 
+  theme_bw() + 
+  geom_line(aes(group=depth_level)) +
+  theme(axis.text=element_text(size=22),
+        axis.text.x=element_text(angle = 45, hjust = 1),
+        axis.title=element_text(size=22),
+        axis.title.x=element_blank()) + 
+  scale_y_reverse() + 
+  ylab("Water Depth (m)") + 
+  scale_x_date(breaks=depth_plot$date,limits=c(as.Date("2016-05-01"),as.Date("2016-07-25")), date_labels = "%B %d") + 
+  geom_dl(aes(label = depth_level), method = list(dl.trans(x = x + 1), dl.combine("last.points"),cex=1.8))
+  
+plot_depth 
+
+```
+
+#plot underwater PAR
+```{r fig.height=6, fig.width=10}
+depth_sampled <-  c(1.5, 5, 10, 20, 30, 40, 60)
+ge_par_all <- read_csv("../metadata/PAR daily_par_cops_2015_2016.csv.gz")
+ge_par <- filter(ge_par_all, depth_edz_m %in% 2 & year_utc=="2016")
+ge_par <- subset(ge_par,is.na(ge_par$par_d_fit_daily_ein_m_2_day_1)==FALSE)
+
+ge_par_mean <- ge_par %>% group_by(year_utc, month_utc, day_utc, depth_edz_m ) %>%  
+  dplyr::summarise(par_daily_mean = mean(par_d_fit_daily_ein_m_2_day_1)) %>%  
+  dplyr::mutate(date = make_date(year_utc, month_utc, day_utc), depth_m = depth_edz_m, depth_m_char = as.character(depth_edz_m))
+
+ge_par_mean$julian_day <- yday(as.POSIXlt(ge_par_mean$date, format="%d%b%y")) 
+ge_par_mean <- select(ungroup(ge_par_mean), date, julian_day, depth_m, par_daily_mean, year_utc)
+ge_par_mean_2016 <- filter(ge_par_mean, year_utc == 2016)
+ge_par_mean_2016$year_utc <- factor(ge_par_mean_2016$year_utc)
+
+par_plot <- ggplot(ge_par_mean_2016, aes(x = date, y = par_daily_mean)) + 
+  rect1 + rect2 + rect3 + 
+  geom_line() +
+  geom_point(size=3) + 
+  ylab(bquote("PAR ("*mol~m^{-2}~d^{-1}*")")) +
+  theme_bw()+ 
+  labs(group = "Year", fill = "Year", col = "Year") +
+  theme(axis.text=element_text(size=22),
+        axis.title=element_text(size=22),
+        legend.title =element_text(size=22,face="bold"),
+        legend.text = element_text(size=22),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  scale_x_date(limits=c(as.Date("2016-05-01"),as.Date("2016-07-25"))) + 
+  scale_y_continuous(breaks = seq(0, 12.5, by = 2.5), limits = c(0,12.5)) +
+  annotate("text", x=as.Date("2016-05-17"), y=12, label= "Stage I (Snow-cover)",size=8) + 
+  annotate("text", x=as.Date("2016-06-09"), y=11, vjust=0.5, label= "Stage II \n (Snow-melt)",size=8) + 
+  annotate("text", x=as.Date("2016-07-05"), y=12, label= "Stage III (Ice-melt)",size=8)
+
+par_plot
+
+```
+
+#CHLA pigments
+```{r fig.height=10, fig.width=18}
+  
+## Plotting  CHLA (Pigment)
+
+chla_pigments<-read.csv("../R_ice_camp/data/metadata_pigments.csv")%>% 
+  filter(str_detect(mission, "ice_camp")) %>% 
+  filter(sample_type %in% c("water", "ice")) %>% 
+  filter(pigment == "Chlorophyll a") %>% 
+  filter(sample_source != "underice") %>% 
+  filter(method == "HPLC") %>%
+  filter(mission == "ice_camp_2016")
+
+# Water Pigment
+chla_water_m2 <- chla_pigments %>% 
+  filter(sample_type == "water") %>% 
+  filter(depth_m <= 60) %>% # Should we use 40m?
+  drop_na(conc_mg_m3) %>% 
+  group_by(mission, date) %>% 
+  mutate(n = n()) %>% 
+  filter(n >= 3)
+library("pracma")
+
+chla_water_m2 <- chla_water_m2 %>% 
+  arrange(depth_m) %>% 
+  group_by(mission, date, sample_type) %>% 
+  nest() %>% 
+  mutate(tchla_mg_m2 = map_dbl(data, ~pracma::trapz(.$depth_m, .$conc_mg_m3))) %>% # 1 ug L == 1 mg m-3
+  select(-data) 
+
+# Ice Pigment
+chla_ice_m2 <- chla_pigments %>%
+  filter(sample_type == "ice") %>% 
+  filter(sample_source %in% c("0-3 cm", "3-10 cm")) %>% 
+  group_by(mission, sample_type, date, sample_source) %>% 
+  summarise(conc_mg_m2 = mean(conc_mg_m2)) %>% 
+  group_by(mission, date) %>% 
+  mutate(n = n()) %>% 
+  filter(n == 2) %>% 
+  group_by(mission, date, sample_type) %>% 
+  summarise(tchla_mg_m2 = sum(conc_mg_m2))
+
+chla_m2 <- bind_rows(chla_ice_m2, chla_water_m2)
+chla_m2$date <- lubridate::ymd(chla_m2$date)
+
+chla_plot_massicotte <- ggplot(chla_m2,aes(x = date, y = tchla_mg_m2, color=sample_type)) +
+  annotate(geom = "rect", 
+           xmin = as.Date("2016-05-01"), xmax = as.Date("2016-06-03"), ymin =0, ymax=Inf,
+           fill = "#CCCCCC",color=NA) +
+  annotate(geom = "rect", 
+           xmin = as.Date("2016-06-03"), xmax = as.Date("2016-06-15"), ymin =0, ymax=Inf,
+           fill = "#DDDDDD", color=NA) +
+  annotate(geom = "rect", 
+           xmin = as.Date("2016-06-15"), xmax = as.Date("2016-07-25"), ymin =0, ymax=Inf,
+           fill = "#EEEEEE", color=NA) +
+  geom_line(data=chla_m2,show.legend = FALSE,size = 1) +
+  geom_point(data=chla_m2,show.legend = FALSE, size = 3) +
+  scale_y_log10() +
+  annotation_logticks(sides = "l") +
+  xlab(NULL) +
+  ylab(bquote("Chl a ("*mg~m^{-2}*")")) +
+  theme_bw() + 
+  theme(axis.text=element_text(size=22),
+        axis.title=element_text(size=22,face="bold"),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  scale_color_manual(values = c("ice" = "#1261A0", "water" = "#48aaad")) +
+  scale_x_date(limits=c(as.Date("2016-05-01"),as.Date("2016-07-25"))) + 
+  geom_dl(aes(label = sample_type), method = list(dl.trans(x = x + 0.5), dl.combine("last.points"),cex=2))
+
+chla_plot_massicotte
+
+```
+
+#Flow cyto pico nano
+```{r fig.height=10, fig.width=18}
+  
+## Plotting under-ice Pico
+
+fcm <- read_excel("../metadata/GE_all_Cytometry version 1.6.xlsx", sheet="All data")%>% 
+  filter(year=="2016") %>%
+  filter(sample_type %in% c("ice","water")) %>%
+  filter(depth_level!="underice") %>% 
+  filter(sample_code<=6 | sample_code%in%c("IC3","IC4")) #only take those involved in metabarcoding
+  
+fcm_pico <- fcm %>% 
+  group_by(date, sample_type) %>%  
+  summarise(pico_ml_mean = mean(Pico_mL)) 
+
+fcm_nano <- fcm %>% 
+  group_by(date, sample_type) %>% 
+  summarise(nano_ml_mean = mean(Nano_mL))
+
+fcm <- left_join(fcm_pico,fcm_nano,by=c("date","sample_type"))
+fcm$pico_nano_ml <- fcm$pico_ml_mean + fcm$nano_ml_mean
+
+fcm$date <-  lubridate::ymd(fcm$date)
+
+fcm_plot <- ggplot(fcm,aes(x = date, y = pico_nano_ml, color=sample_type)) +
+  annotate(geom = "rect", 
+           xmin = as.Date("2016-05-01"), xmax = as.Date("2016-06-03"), ymin =0, ymax=Inf,
+           fill = "#CCCCCC",color=NA) +
+  annotate(geom = "rect", 
+           xmin = as.Date("2016-06-03"), xmax = as.Date("2016-06-15"), ymin =0, ymax=Inf,
+           fill = "#DDDDDD", color=NA) +
+  annotate(geom = "rect", 
+           xmin = as.Date("2016-06-15"), xmax = as.Date("2016-07-25"), ymin =0, ymax=Inf,
+           fill = "#EEEEEE", color=NA) +
+  geom_line(data=fcm,show.legend = FALSE,size = 1) +
+  geom_point(data=fcm,show.legend = FALSE, size = 3) +
+  scale_y_log10() +
+  annotation_logticks(sides = "l") +
+  xlab(NULL) +
+  ylab("Pico-Nano FCM (cells/mL)") +
+  theme_bw() + 
+  theme(axis.text=element_text(size=22),
+        axis.title=element_text(size=22),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  scale_color_manual(values = c("ice" = "#1261A0", "water" = "#48aaad")) +
+  scale_x_date(limits=c(as.Date("2016-05-01"),as.Date("2016-07-25"))) + 
+  geom_dl(aes(label = sample_type), method = list(dl.trans(x = x + 0.5), dl.combine("last.points"),cex=2))
+
+fcm_plot
+```
+
+# All together
+
+```{r fig.height=10, fig.width=18}
+pdf("./GE_IC_unsorted_figs/sampling_depth.pdf", height=16, width=22); plot(par_plot/chla_plot_massicotte/fcm_plot/plot_ice_snow/plot_depth); dev.off() 
+```
+
+#change back to categorical for plotting
+```{r fig.height=10, fig.width=18}
+sampling_dates<-c("2016-05-09","2016-05-23","2016-05-30","2016-06-06","2016-06-13","2016-06-20","2016-06-27","2016-07-06","2016-07-18")
+sampling_dates_plot<-c("May 09","May 23","May 30","Jun 06","Jun 13","Jun 20","Jun 27","Jul 06","Jul 18")
+
+long$date <- factor(long$date, levels=sampling_dates)
+
+long$date<-str_replace(long$date,"2016-05-","May ")
+long$date<-str_replace(long$date,"2016-06-","Jun ")
+long$date<-str_replace(long$date,"2016-07-","Jul ")
+long$date <- factor(long$date, levels=sampling_dates_plot)
+```
+
+# Ordination Plot to check for clustering of samples
+```{r fig.height=8, fig.width=14}
+ps_TS_DNA <- subset_samples(ps_TS, DNA_RNA=="DNA")
+ps_TS_DNA <- subset_taxa(ps_TS_DNA, trophic_mode=="photosynthetic")
+ord_DNA <- ordinate(ps_TS_DNA, "NMDS", "bray")
+
+#read manually created color pallete and arrangement of species
+nmds_colors <- read_excel("../R_ice_camp/GE_IC_clarence_colors.xlsx", sheet="nmds")
+
+#manually curated color palette
+nmdsPalette<-as.vector(nmds_colors$color_code)
+names(nmdsPalette)<-nmds_colors$cluster
+
+p <- plot_ordination(ps_TS_DNA, ord_DNA, type="sample", color="cluster", shape="fraction_name") + 
+  geom_point(size=6) + 
+  theme(text = element_text(size = 20)) + 
+  scale_color_manual(values=nmdsPalette) +
+  theme_bw() +
+  annotate("text", x=1.2, y=1.5, label=str_c("Stress = ",round(ord_DNA$stress,4)),size=8) +
+  theme(axis.text=element_text(size=22),
+        axis.title=element_text(size=22,face="bold"),
+        legend.text = element_text(size=22),
+        legend.title = element_text(size=22))
+# +  stat_ellipse(position="identity",geom="polygon",type="t",alpha=0)
+
+p
+
+library("vegan")
+cluster = get_variable(ps_TS_DNA, "fraction_name")
+cluster_ano = anosim(phyloseq::distance(ps_TS_DNA,"bray"),cluster)
+print(str_c("ANOSIM size fraction | R = ",round(cluster_ano$statistic,4)," | p = ",cluster_ano$signif))
+
+cluster = get_variable(ps_TS_DNA, "substrate")
+cluster_ano = anosim(phyloseq::distance(ps_TS_DNA,"bray"),cluster)
+print(str_c("ANOSIM substrate | R = ",round(cluster_ano$statistic,4)," | p = ",cluster_ano$signif))
+
+ps_TS_DNA_ice<-subset_samples(ps_TS_DNA, substrate=="ice")
+cluster = get_variable(ps_TS_DNA_ice, "bloom_stage")
+cluster_ano = anosim(phyloseq::distance(ps_TS_DNA_ice,"bray"),cluster)
+print(str_c("ANOSIM Ice Bloom_stage | R = ",round(cluster_ano$statistic,4)," | p = ",cluster_ano$signif))
+cluster = get_variable(ps_TS_DNA_ice, "fraction_name")
+cluster_ano = anosim(phyloseq::distance(ps_TS_DNA_ice,"bray"),cluster)
+print(str_c("ANOSIM Ice size fraction | R = ",round(cluster_ano$statistic,4)," | p = ",cluster_ano$signif))
+
+ps_TS_DNA_water<-subset_samples(ps_TS_DNA, substrate=="water")
+cluster = get_variable(ps_TS_DNA_water, "bloom_stage")
+cluster_ano = anosim(phyloseq::distance(ps_TS_DNA_water,"bray"),cluster)
+print(str_c("ANOSIM Water Bloom_stage | R = ",round(cluster_ano$statistic,4)," | p = ",cluster_ano$signif))
+cluster = get_variable(ps_TS_DNA_water, "fraction_name")
+cluster_ano = anosim(phyloseq::distance(ps_TS_DNA_water,"bray"),cluster)
+print(str_c("ANOSIM Water size fraction | R = ",round(cluster_ano$statistic,4)," | p = ",cluster_ano$signif))
+
+pdf("./GE_IC_unsorted_figs/unsorted_nmds.pdf", height=12, width=20); plot(p); dev.off() 
+
+```
+
+# Plot Main trophic mode across all ice and water
+```{r fig.height=10, fig.width=16}
+
+unallocated<-subset(long,is.na(long$trophic_mode)==TRUE)
+unallocated<-unallocated[!duplicated(unallocated$species), ]
+
+long_DNA <- subset(long, DNA_RNA=="DNA")
+long_DNA <- subset(long_DNA, !(species%in%unallocated$species))
+
+#length(unique(long_DNA$species))
+long_DNA$trophic_mode<-factor(long_DNA$trophic_mode, levels=c("photosynthetic","mixotrophic","dinoflagellata","heterotrophic"))
+
+long_DNA_trophic<-long_DNA
+long_DNA_trophic$date <- factor(long_DNA_trophic$date, levels=sampling_dates_plot)
+
+long_DNA_trophic <- long_DNA_trophic %>% group_by(fraction_name,depth_level,date,trophic_mode) %>% summarize(n_reads=sum(n_reads))
+  
+p <- ggplot(long_DNA_trophic, aes(x=date, y=n_reads, fill=trophic_mode)) + 
+  geom_bar(position="fill", stat="identity", color="black",size=0.3) + 
+  theme_bw() +
+  theme(text=element_text(size=26),
+        axis.text.x = element_text(angle = 45,  hjust=1, vjust=-0.5),
+        axis.title.x=element_blank(),
+        legend.title=element_blank(),
+        panel.spacing.x=unit(2, "lines"),
+        panel.spacing.y=unit(1, "lines"), 
+        plot.margin = unit(c(0,0,3,0), "cm"),
+        panel.grid=element_blank(),
+        strip.background=element_blank(),
+        legend.key.size=unit(2,"line")) +
+  ylab("Proportion of DNA reads") +
+  scale_y_continuous(labels=scales::percent, breaks = seq(0,1, by=0.5)) +
+  facet_grid(cols = vars(fraction_name), rows=vars(depth_level), scales="free_x") + 
+  scale_fill_manual(values=trophicPalette, 
+                    breaks = c("photosynthetic","mixotrophic","dinoflagellata","heterotrophic")) 
+p 
+
+pdf("./GE_IC_unsorted_figs/unsorted_trophic_overall.pdf", height=14, width=20); plot(p); dev.off() 
+```
+
+
+# Plot Biogeo across all samples
+```{r fig.height=10, fig.width=16}
+
+long_biogeo <- long_DNA %>% 
+  filter(trophic_mode=="photosynthetic") %>%
+  group_by(fraction_name,depth_level,date,biogeo) %>% 
+  summarize(n_reads=sum(n_reads))
+
+long_biogeo$date <- factor(long_biogeo$date, levels=sampling_dates_plot)
+
+unique(long_biogeo$biogeo)
+
+long_biogeo$biogeo<-factor(long_biogeo$biogeo, levels=c("Polar","Polar-Temperate","Temperate","Cosmopolitan","Unallocated"))
+
+unallocated<-long_biogeo %>% filter(biogeo=="Unallocated") 
+sum(unallocated$n_reads)/sum(long_biogeo$n_reads)
+
+p <- ggplot(long_biogeo, aes(x=date, y=n_reads, fill=biogeo)) + 
+  geom_bar(position="fill", stat="identity",color="black",size=0.3) + 
+  theme_bw() +
+  theme(text=element_text(size=26),
+        axis.text.x = element_text(angle = 45,  hjust=1, vjust=-0.5),
+        axis.title.x=element_blank(),
+        legend.title=element_blank(),
+        panel.spacing.x=unit(2, "lines"),
+        panel.spacing.y=unit(1, "lines"), 
+        plot.margin = unit(c(0,0,3,0), "cm"),
+        panel.grid=element_blank(),
+        strip.background=element_blank(),
+        legend.key.size=unit(2,"line")) +
+  ylab("Proportion of DNA reads") + 
+  scale_y_continuous(labels=scales::percent, breaks = seq(0,1, by=0.5)) +
+  facet_grid(cols = vars(fraction_name), rows=vars(depth_level), scales="free_x") + 
+  scale_fill_manual(values=biogeoPalette, 
+                    breaks = c("Polar","Polar-Temperate","Temperate","Cosmopolitan","Unallocated"))
+p 
+
+pdf("./GE_IC_unsorted_figs/unsorted_biogeo_photosynthetic.pdf", height=14, width=20); plot(p); dev.off() 
+```
+
+# Make table of ASV properties and assignment
+```{r}
+ASVs <- (unique(long_DNA$asv_code))
+taxa_DNA <- taxa %>%
+  filter(asv_code%in%ASVs) %>% 
+  select(-PAH,-functional_trait)
+write.csv(taxa_DNA,"../R_ice_camp/asv_properties.csv")
+```
+
+# Splitting data into Trophic Modes 
+```{r fig.height=10, fig.width=18}
+long_mixotrophic <- subset(long_DNA,trophic_mode=="mixotrophic")
+long_photosynthetic <- subset(long_DNA,trophic_mode=="photosynthetic")
+long_heterotrophic <-subset(long_DNA,trophic_mode=="heterotrophic")
+long_dino <-subset(long_DNA,trophic_mode=="dinoflagellata")
+```
+
+# Tree map
+```{r fig.height=6, fig.width=6}
+long_phyto_ice<-subset(long_photosynthetic,substrate=="ice")
+long_phyto_water<-subset(long_photosynthetic,substrate=="water")
+
+length(unique(long_DNA$asv_code))
+#ice_species<-as.data.frame(unique(long_phyto_ice$species))
+water_species<-as.data.frame(unique(long_phyto_water$species))
+
+tree_phyto_ice <- phyloseq_long_treemap(long_phyto_ice,division,class,"")
+tree_phyto_water <- phyloseq_long_treemap(long_phyto_water,division,class,"")
+
+```
+
+# Read abundance plot (photosynthetic)
+```{r fig.height=10, fig.width=18}
+
+
+long_DNA_ice<-subset(long_DNA,substrate=="ice" & trophic_mode=="photosynthetic")
+long_DNA_water<-subset(long_DNA,substrate=="water" & trophic_mode=="photosynthetic")
+
+DNA_ice <- long_DNA_ice %>% 
+  group_by(class, species) %>% 
+  summarize(n_reads=sum(n_reads)) %>% 
+  arrange(desc(n_reads)) 
+species_levels<-DNA_ice$species
+DNA_ice <-DNA_ice %>% 
+  mutate(species=factor(species,species_levels))
+
+DNA_water <- long_DNA_water %>% 
+  group_by(class, species) %>% 
+  summarize(n_reads=sum(n_reads)) %>% 
+  arrange(desc(n_reads)) 
+species_levels<-DNA_water$species
+DNA_water <-DNA_water %>% 
+  mutate(species=factor(species,species_levels))
+
+DNA_ice<-DNA_ice[1:20,]
+DNA_water<-DNA_water[1:20,]
+
+options(scipen=200000)
+
+DNA_ice_plot <- ggplot(DNA_ice, aes(x=n_reads, y=reorder(species,desc(species)), fill=class)) + 
+  geom_bar(stat="identity") +
+  theme_bw() + 
+  xlab("Number of reads")  +
+  ggtitle("Ice community") +
+  theme(text=element_text(size=24), 
+        axis.text.y=element_text(face="italic"), 
+        axis.title.y=element_blank(),
+        legend.position="top",
+        plot.title = element_text(hjust=0.5),
+        panel.grid=element_blank()) +
+  guides(fill = guide_legend(nrow = 2)) +
+  scale_fill_manual(values=classPalette, breaks=unique(DNA_ice$class), name="Class")
+DNA_ice_plot
+
+DNA_water_plot <- ggplot(DNA_water, aes(x=n_reads, y=reorder(species,desc(species)), fill=class)) + 
+  geom_bar(stat="identity") +
+  theme_bw() + 
+  xlab("Number of reads") +
+  ggtitle("Water community") +
+  theme(text=element_text(size=24), 
+        axis.text.y=element_text(face="italic"), 
+        axis.title.y=element_blank(),
+        legend.position="top",
+        plot.title = element_text(hjust=0.5),
+        panel.grid=element_blank()) +
+  guides(fill = guide_legend(nrow = 2)) +
+  scale_fill_manual(values=classPalette, breaks=unique(DNA_water$class), name="Class")
+DNA_water_plot
+
+pdf("./GE_IC_unsorted_figs/community.pdf", height=17, width=21); plot((DNA_ice_plot+tree_phyto_ice)/(DNA_water_plot+tree_phyto_water)); dev.off() 
+```
+
+# Indicator ASV between substrates 
+# results saved in GE_IC_indicspecies.xlsx
+
+```{r fig.height=6, fig.width=16}
+
+#wide_photosynthetic <- long_photosynthetic %>% #pivot_wider(id_cols=c(sample_name,substrate),names_from=asv_code, values_from=n_reads,values_fill=0)
+#abund<-wide_photosynthetic[,-c(1:2)]
+#substrate<-wide_photosynthetic$substrate
+#inv <- multipatt(abund, substrate, func="IndVal.g",control=how(nperm=9999))
+#summary(inv, indvalcomp = TRUE)
+#options(max.print=100)
+#The above data was manually converted into csv and excel
+
+```
+
+# Indicator ASV between stage clusters
+# results saved in GE_IC_indicspecies.xlsx
+
+```{r fig.height=6, fig.width=16}
+
+#wide_photosynthetic <- long_photosynthetic %>% #pivot_wider(id_cols=c(sample_name,bloom_cluster),names_from=asv_code, values_from=n_reads,values_fill=0)
+#abund<-wide_photosynthetic[,-c(1:2)]
+#stage<-wide_photosynthetic$bloom_cluster
+#inv <- multipatt(abund, stage, func="IndVal.g",control=how(nperm=9999))
+#summary(inv, indvalcomp = TRUE)
+#The above data was manually converted into csv and excel
+
+```
+
+# Indicator ASV between substrates in Stage_I and Stages_II_and_III separately
+# results saved in GE_IC_indicspecies.xlsx
+
+```{r fig.height=6, fig.width=16}
+
+#wide_photosynthetic <- long_photosynthetic %>% 
+#  filter(bloom_cluster=="Stage_I") %>%
+#  pivot_wider(id_cols=c(sample_name,substrate),names_from=asv_code, values_from=n_reads,values_fill=0)
+#abund<-wide_photosynthetic[,-c(1:2)]
+#substrate<-wide_photosynthetic$substrate
+#inv <- multipatt(abund, substrate, func="IndVal.g",control=how(nperm=9999))
+#summary(inv, indvalcomp = TRUE)
+#options(max.print=1000)
+#The above data was manually converted into csv and excel
+
+#wide_photosynthetic <- long_photosynthetic %>% 
+#  filter(bloom_cluster=="Stages_II_and_III") %>%
+#  pivot_wider(id_cols=c(sample_name,substrate),names_from=asv_code, values_from=n_reads,values_fill=0)
+#abund<-wide_photosynthetic[,-c(1:2)]
+#substrate<-wide_photosynthetic$substrate
+#inv <- multipatt(abund, substrate, func="IndVal.g",control=how(nperm=9999))
+#summary(inv, indvalcomp = TRUE)
+#options(max.print=1000)
+##The above data was manually converted into csv and excel
+
+```
+
+# To make list of ASV for biogeo density plot
+
+```{r}
+asv_photo <- long_photosynthetic %>%
+  group_by(asv_code) %>%
+  summarize(total_reads=sum(n_reads)) %>% 
+  arrange(desc(total_reads))
+asv_save <- left_join(asv_photo,taxa %>% select(asv_code,casv_code) ,by="asv_code")
+write.csv(asv_save,"../R_ice_camp/unsorted_asv_photo.csv")
+asv_photo <- left_join(asv_photo,taxa ,by="asv_code")
+```
+  
+# Indicator Species (substrate) and biogeo
+
+```{r fig.height=6, fig.width=16}
+
+# PCH allocation for biogeo
+biogeoShapes<-c(15,17,16,18,8,9,10,4,3)
+names(biogeoShapes)<-c("Polar","Polar-Temperate","Polar-Tropical","Temperate","Temperate-Tropical","Tropical","Cosmopolitan","Unallocated","NA")
+
+indic_substrate <- read_excel("../R_ice_camp/GE_IC_indicspecies.xlsx", sheet="substrate")
+
+indic_phyto_ice <- long_phyto_ice %>%
+  group_by(asv_code) %>%
+  summarize(total_reads=sum(n_reads)) %>% 
+  arrange(desc(total_reads))
+indic_phyto_ice <- left_join(indic_phyto_ice, taxa, by="asv_code")
+indic_phyto_ice$substrate <- "ice"
+indic_phyto_ice <- left_join(indic_phyto_ice, indic_substrate, by=c("asv_code","substrate"))
+
+indic_phyto_water <- long_phyto_water %>%
+  group_by(asv_code) %>%
+  summarize(total_reads=sum(n_reads)) %>% 
+  arrange(desc(total_reads))
+indic_phyto_water <- left_join(indic_phyto_water, taxa, by="asv_code")
+indic_phyto_water$substrate <- "water"
+indic_phyto_water <- left_join(indic_phyto_water, indic_substrate, by=c("asv_code","substrate"))
+
+indic_substrate_top<-rbind(indic_phyto_ice[1:20,],indic_phyto_water[1:20,])
+
+indic_substrate_top$species<-ifelse(as.numeric(indic_substrate_top$PR2_matches)>0,str_c(indic_substrate_top$species, "  +"),indic_substrate_top$species)
+
+indic_substrate_plot<-lollipop_chart(indic_substrate_top,asv_code,total_reads,facet=substrate, color=class, pch=biogeo,line_size=0.5, point_size=5) +
+  theme_bw() +
+  ylab("Total number of DNA reads of ASVs within substrate") +
+  theme(text=element_text(size=24),
+        axis.text.x = element_text(angle = 0, hjust = 1), 
+        axis.text.y = element_text(size=20,family="Courier"),
+        axis.title.y = element_blank(),
+        legend.position="top",
+        legend.spacing.y=unit(2,"lines"),
+        legend.key.size = unit(2,"lines"),
+        legend.text = element_text(margin = margin(r=1,unit="cm")),
+        panel.grid=element_blank(),
+        panel.spacing.x=unit(2, "lines"),
+        strip.background=element_blank(),
+        panel.background = element_rect(fill="white")) +
+  scale_y_log10(limits=c(1e3,1e6), expand = c(0, 0), breaks = scales::trans_breaks("log10", function(x) 10^x),labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  geom_text(aes(x=asv_code,y=total_reads,label=species),size=6,hjust=0, nudge_y=0.07,show.legend = FALSE,fontface="italic",family="Helvetica") +
+  geom_text(aes(x=asv_code,y=total_reads,label=sig),size=6,vjust=-0.4,show.legend = FALSE) +
+  guides(color=guide_legend(ncol=3, title.position = "top"), shape=guide_legend(ncol=2,title.position="top")) +
+  scale_color_manual(values=classPalette, breaks=unique(indic_substrate_top$class), name="Class") +
+  scale_shape_manual(values=biogeoShapes, name="Biogeographic Distribution", breaks=c("Polar","Polar-Temperate","Cosmopolitan","Unallocated"))
+
+indic_substrate_plot
+
+pdf("./GE_IC_unsorted_figs/indicatorASV_substrate.pdf", height=17, width=24); plot(indic_substrate_plot); dev.off() 
+```
+
+# Indicator Species (substrate) in only stage I
+
+```{r fig.height=6, fig.width=16}
+
+# PCH allocation for biogeo
+
+indic_substrate <- read_excel("../R_ice_camp/GE_IC_indicspecies.xlsx", sheet="substrate_Stage_I")
+
+indic_phyto_ice <- long_phyto_ice %>%
+  filter(bloom_cluster=="Stage_I") %>%
+  group_by(asv_code) %>%
+  summarize(total_reads=sum(n_reads)) %>% 
+  arrange(desc(total_reads))
+indic_phyto_ice <- left_join(indic_phyto_ice, taxa, by="asv_code")
+indic_phyto_ice$substrate <- "ice"
+indic_phyto_ice <- left_join(indic_phyto_ice, indic_substrate, by=c("asv_code","substrate"))
+
+indic_phyto_water <- long_phyto_water %>%
+  filter(bloom_cluster=="Stage_I") %>%  
+  group_by(asv_code) %>%
+  summarize(total_reads=sum(n_reads)) %>% 
+  arrange(desc(total_reads))
+indic_phyto_water <- left_join(indic_phyto_water, taxa, by="asv_code")
+indic_phyto_water$substrate <- "water"
+indic_phyto_water <- left_join(indic_phyto_water, indic_substrate, by=c("asv_code","substrate"))
+
+indic_substrate_top<-rbind(indic_phyto_ice[1:20,],indic_phyto_water[1:20,])
+
+indic_substrate_top$species<-ifelse(as.numeric(indic_substrate_top$PR2_matches)>0,str_c(indic_substrate_top$species, "  +"),indic_substrate_top$species)
+
+indic_substrate_plot<-lollipop_chart(indic_substrate_top,asv_code,total_reads,facet=substrate, color=class, pch=biogeo,line_size=0.5, point_size=5) +
+  theme_bw() +
+  ylab("Total number of DNA reads of ASVs within substrate") +
+  theme(text=element_text(size=24),
+        axis.text.x = element_text(angle = 0, hjust = 1), 
+        axis.text.y = element_text(size=20,family="Courier"),
+        axis.title.y = element_blank(),
+        legend.position="top",
+        legend.spacing.y=unit(2,"lines"),
+        legend.key.size = unit(2,"lines"),
+        legend.text = element_text(margin = margin(r=1,unit="cm")),
+        panel.grid=element_blank(),
+        panel.spacing.x=unit(2, "lines"),
+        strip.background=element_blank(),
+        panel.background = element_rect(fill="white")) +
+  scale_y_log10(limits=c(1e3,1e5), expand = c(0, 0), breaks = scales::trans_breaks("log10", function(x) 10^x),labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  geom_text(aes(x=asv_code,y=total_reads,label=species),size=6,hjust=0, nudge_y=0.07,show.legend = FALSE,fontface="italic",family="Helvetica") +
+  geom_text(aes(x=asv_code,y=total_reads,label=sig),size=6,vjust=-0.4,show.legend = FALSE) +
+  guides(color=guide_legend(ncol=3, title.position = "top"), shape=guide_legend(ncol=2,title.position="top")) +
+  scale_color_manual(values=classPalette, breaks=unique(indic_substrate_top$class), name="Class") +
+  scale_shape_manual(values=biogeoShapes, name="Biogeographic Distribution", breaks=c("Polar","Polar-Temperate","Cosmopolitan","Unallocated"))
+
+indic_substrate_plot
+
+pdf("./GE_IC_unsorted_figs/indicatorASV_substrate_stage_I.pdf", height=17, width=24); plot(indic_substrate_plot); dev.off() 
+```
+
+# Indicator Species (substrate) in only stages II_and_III
+
+```{r fig.height=6, fig.width=16}
+
+# PCH allocation for biogeo
+
+indic_substrate <- read_excel("../R_ice_camp/GE_IC_indicspecies.xlsx", sheet="substrate_Stages_II_and_III")
+
+indic_phyto_ice <- long_phyto_ice %>%
+  filter(bloom_cluster=="Stages_II_and_III") %>%
+  group_by(asv_code) %>%
+  summarize(total_reads=sum(n_reads)) %>% 
+  arrange(desc(total_reads))
+indic_phyto_ice <- left_join(indic_phyto_ice, taxa, by="asv_code")
+indic_phyto_ice$substrate <- "ice"
+indic_phyto_ice <- left_join(indic_phyto_ice, indic_substrate, by=c("asv_code","substrate"))
+
+indic_phyto_water <- long_phyto_water %>%
+  filter(bloom_cluster=="Stages_II_and_III") %>%  
+  group_by(asv_code) %>%
+  summarize(total_reads=sum(n_reads)) %>% 
+  arrange(desc(total_reads))
+indic_phyto_water <- left_join(indic_phyto_water, taxa, by="asv_code")
+indic_phyto_water$substrate <- "water"
+indic_phyto_water <- left_join(indic_phyto_water, indic_substrate, by=c("asv_code","substrate"))
+
+indic_substrate_top<-rbind(indic_phyto_ice[1:20,],indic_phyto_water[1:20,])
+
+indic_substrate_top$species<-ifelse(as.numeric(indic_substrate_top$PR2_matches)>0,str_c(indic_substrate_top$species, "  +"),indic_substrate_top$species)
+
+indic_substrate_plot<-lollipop_chart(indic_substrate_top,asv_code,total_reads,facet=substrate, color=class, pch=biogeo,line_size=0.5, point_size=5) +
+  theme_bw() +
+  ylab("Total number of DNA reads of ASVs within substrate") +
+  theme(text=element_text(size=24),
+        axis.text.x = element_text(angle = 0, hjust = 1), 
+        axis.text.y = element_text(size=20,family="Courier"),
+        axis.title.y = element_blank(),
+        legend.position="top",
+        legend.spacing.y=unit(2,"lines"),
+        legend.key.size = unit(2,"lines"),
+        legend.text = element_text(margin = margin(r=1,unit="cm")),
+        panel.grid=element_blank(),
+        panel.spacing.x=unit(2, "lines"),
+        strip.background=element_blank(),
+        panel.background = element_rect(fill="white")) +
+  scale_y_log10(limits=c(1e3,1e6), expand = c(0, 0), breaks = scales::trans_breaks("log10", function(x) 10^x),labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  geom_text(aes(x=asv_code,y=total_reads,label=species),size=6,hjust=0, nudge_y=0.07,show.legend = FALSE,fontface="italic",family="Helvetica") +
+  geom_text(aes(x=asv_code,y=total_reads,label=sig),size=6,vjust=-0.4,show.legend = FALSE) +
+  guides(color=guide_legend(ncol=3, title.position = "top"), shape=guide_legend(ncol=2,title.position="top")) +
+  scale_color_manual(values=classPalette, breaks=unique(indic_substrate_top$class), name="Class") +
+  scale_shape_manual(values=biogeoShapes, name="Biogeographic Distribution", breaks=c("Polar","Polar-Temperate","Cosmopolitan","Unallocated"))
+
+indic_substrate_plot
+
+pdf("./GE_IC_unsorted_figs/indicatorASV_substrate_stages_II_and_III.pdf", height=17, width=24); plot(indic_substrate_plot); dev.off() 
+```
+
+# Indicator Species (bloom_cluster) and biogeo
+
+```{r fig.height=6, fig.width=16}
+indic_bloom_cluster <- read_excel("../R_ice_camp/GE_IC_indicspecies.xlsx", sheet="bloom_cluster")
+
+long_phyto_Stage_I <- subset(long_photosynthetic,bloom_cluster=="Stage_I")
+long_phyto_Stages_II_and_III <- subset(long_photosynthetic,bloom_cluster=="Stages_II_and_III")
+
+indic_phyto_Stage_I <- long_phyto_Stage_I %>%
+  group_by(asv_code) %>%
+  summarize(total_reads=sum(n_reads)) %>% 
+  arrange(desc(total_reads))
+indic_phyto_Stage_I <- left_join(indic_phyto_Stage_I, taxa, by="asv_code")
+indic_phyto_Stage_I$bloom_cluster <- "Stage_I"
+indic_phyto_Stage_I <- left_join(indic_phyto_Stage_I, indic_bloom_cluster, by=c("asv_code","bloom_cluster"))
+
+indic_phyto_Stages_II_and_III <- long_phyto_Stages_II_and_III %>%
+  group_by(asv_code) %>%
+  summarize(total_reads=sum(n_reads)) %>% 
+  arrange(desc(total_reads))
+indic_phyto_Stages_II_and_III <- left_join(indic_phyto_Stages_II_and_III, taxa, by="asv_code")
+indic_phyto_Stages_II_and_III$bloom_cluster <- "Stages_II_and_III"
+indic_phyto_Stages_II_and_III <- left_join(indic_phyto_Stages_II_and_III, indic_bloom_cluster, by=c("asv_code","bloom_cluster"))
+
+indic_bloom_cluster_top<-rbind(indic_phyto_Stage_I[1:20,],indic_phyto_Stages_II_and_III[1:20,])
+indic_bloom_cluster_top$species<-ifelse(as.numeric(indic_bloom_cluster_top$PR2_matches)>0,str_c(indic_bloom_cluster_top$species, "  +"),indic_bloom_cluster_top$species)
+
+indic_bloom_cluster_plot<-lollipop_chart(indic_bloom_cluster_top,asv_code,total_reads,facet=bloom_cluster, color=class, pch=biogeo,line_size=0.5, point_size=4.5) +
+  theme_bw() +
+  ylab("Total number of DNA reads of ASVs within bloom_cluster") +
+  theme(text=element_text(size=24),
+        axis.text.x = element_text(angle = 0, hjust = 1), 
+        axis.text.y = element_text(size=20,family="Courier"),
+        axis.title.y = element_blank(),
+        legend.position="top",
+        legend.spacing.y=unit(2,"lines"),
+        legend.key.size = unit(2,"lines"),
+        legend.text = element_text(margin = margin(r=1,unit="cm")),
+        panel.grid=element_blank(),
+        panel.spacing.x=unit(2, "lines"),
+        strip.background=element_blank(),
+        panel.background = element_rect(fill="white")) +
+  scale_y_log10(limits=c(1e3,1e6), expand = c(0, 0), breaks = scales::trans_breaks("log10", function(x) 10^x),labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  geom_text(aes(x=asv_code,y=total_reads,label=species),size=6,hjust=0, nudge_y=0.07,show.legend = FALSE,fontface="italic",family="Helvetica") +
+  geom_text(aes(x=asv_code,y=total_reads,label=sig),size=6,vjust=-0.4,show.legend = FALSE) +
+  guides(color=guide_legend(ncol=3, title.position = "top"), shape=guide_legend(ncol=2,title.position="top")) +
+  scale_color_manual(values=classPalette, breaks=unique(indic_bloom_cluster_top$class), name="Class") +
+  scale_shape_manual(values=biogeoShapes, name="Biogeographic Distribution", breaks=c("Polar","Polar-Temperate","Cosmopolitan","Unallocated"))
+
+indic_bloom_cluster_plot
+
+pdf("./GE_IC_unsorted_figs/indicatorASV_bloom_cluster.pdf", height=17, width=24); plot(indic_bloom_cluster_plot); dev.off() 
+
+# Bold species label that are significant 
+```
+
+
+
+# Analysing photosynthetic at Species Level
+
+```{r fig.height=13, fig.width=16}
+sample_reads <-long_photosynthetic %>% 
+  group_by(sample_name) %>% 
+  summarize(sample_reads=sum(n_reads))
+
+plot_phyto <-long_photosynthetic %>% 
+  group_by(sample_name,species,date,depth_level,fraction_name) %>% 
+  summarize(n_reads=sum(n_reads))
+
+plot_phyto <- left_join(plot_phyto,sample_reads,by="sample_name",copy=FALSE) 
+
+#normalize reads within photosynthetic
+plot_phyto$proportion <- plot_phyto$n_reads/plot_phyto$sample_reads
+
+#find top 80% species in normalized photosynthetic
+top_phyto_species <-plot_phyto %>% group_by(species) %>% summarize(normalized_proportion=sum(proportion)) %>% arrange(desc(normalized_proportion)) 
+sum(top_phyto_species$normalized_proportion[1:20])/sum(top_phyto_species$normalized_proportion) #find 90%
+
+top_phyto_species <- top_phyto_species$species[1:20]
+
+#filter plot_phyto for only the top 80% species
+plot_phyto <- subset(plot_phyto,plot_phyto$species %in% top_phyto_species)
+
+phyto_colors <- read_excel("../R_ice_camp/GE_IC_clarence_colors.xlsx", sheet="phyto")
+label <- phyto_colors %>% select(species, label)
+
+#to create labels to label species that has at least 10% of reads
+labels <- plot_phyto %>% 
+  filter(proportion>0.1) %>% 
+  left_join(label,by="species") %>%
+  select(sample_name,species,date,depth_level,fraction_name,label)
+
+plot_phyto <- plot_phyto %>% 
+  group_by(sample_name,species,date,depth_level,fraction_name) %>% 
+  summarize(n_reads=sum(n_reads)) 
+
+plot_phyto <- left_join(plot_phyto,labels,by=c("sample_name","species","date","depth_level","fraction_name"))
+
+#read manually created color pallete and arrangement of species
+phyto_colors <- read_excel("../R_ice_camp/GE_IC_clarence_colors.xlsx", sheet="phyto")
+plot_phyto$species <- factor(plot_phyto$species,levels=phyto_colors$species)
+phytoPalette<-as.vector(phyto_colors$color_code)
+names(phytoPalette)<-phyto_colors$species
+
+  
+p <- ggplot(plot_phyto, aes(x=date, y=n_reads,fill=species)) + 
+        geom_bar(position="fill", stat="identity",color="black",size=0.3) + theme_bw()+
+        theme(text=element_text(size=20),
+              axis.text.x = element_text(angle = 45, hjust = 1), 
+              legend.justification = "top", 
+              legend.spacing.y=unit(1,'cm'), 
+              panel.background = element_rect(fill="white"),
+              panel.spacing.x=unit(2, "lines"),
+              panel.spacing.y=unit(1, "lines"), 
+              plot.margin = unit(c(0,0,3,0), "cm"),
+              panel.grid = element_blank(),
+              strip.background=element_blank(),
+              legend.text = element_text(face="italic"),
+              legend.key.size=unit(2,"line")) + 
+        guides(fill=guide_legend(ncol=1)) +
+        ylab("Proportion of reads") +
+        geom_text(aes(x=date,y=n_reads,label=label,vjust=0.5),position=position_fill(vjust=0.5),size=3, show.legend = FALSE, family="Helvetica",color="white") +
+        scale_y_continuous(labels=scales::percent, breaks = seq(0,1, by=0.5)) +
+        scale_color_manual(values=phytoPalette) + scale_fill_manual(values=phytoPalette) +
+        facet_grid(cols = vars(fraction_name), rows=vars(depth_level), scales="free_x")
+
+p
+
+pdf("./GE_IC_unsorted_figs/unsorted_phyto_species.pdf", height=20, width=20) ; plot(p) ; dev.off() 
+```
+
+# Culturability of ASVs
+```{r fig.height=5, fig.width=8}
+
+asv_blast_div <- asv_photo %>%
+  filter(as.numeric(PR2_matches)>0) %>%
+  group_by(division) %>%
+  count() %>%
+  summarise(n) %>%
+  rename(PR2_matches=n)
+
+asv_div<- asv_photo %>% 
+  group_by(division) %>%
+  count() %>%
+  summarise(n) %>%
+  arrange(desc(n))
+
+culture <- left_join(asv_div,asv_blast_div,by="division") %>%
+  replace(is.na(.), 0) %>%
+  mutate(no_matches=n-PR2_matches) %>%
+  pivot_longer(cols=c("PR2_matches","no_matches"),names_to="matches",values_to="count") %>%
+  mutate(division=str_c(division,"\n (N = ",n,")"))
+
+culture_plot <- ggplot(culture,aes(x=count,y=reorder(division,(n)),fill=matches)) +
+  geom_bar(position="fill",stat="identity") +
+  theme_bw() +
+  theme(text=element_text(size=24),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        legend.spacing.y=unit(1,'cm'), 
+        panel.background = element_rect(fill="white"),
+        plot.margin = unit(c(0,0,0,0), "cm"),
+        panel.grid = element_blank()) + 
+  scale_x_continuous(labels=scales::percent, breaks = seq(0,1, by=0.25)) +
+  scale_fill_manual(values=c("#2171B5","#FB6A4A"),breaks=c("PR2_matches","no_matches"))
+culture_plot
+
+# create supplementary graph but DIVISION (proportion of ASVs that match PR2)
+pdf("./GE_IC_unsorted_figs/unsorted_culturability.pdf", height=8, width=14) ; plot(culture_plot) ; dev.off() 
+```
+
+# Plotting individual species and their ASVs and their map on metaPR2
+
+```{r fig.height=5, fig.width=5}
+#count number of ASVs in taxa
+for(i in top_phyto_species){
+long_DNA_sub<-filter(long_DNA,species==i)
+print(length(unique(long_DNA_sub$asv_code)))
+}
+
+#species that appeared in Fig
+top_phyto_species_asvs <- c("Phaeocystis_pouchetii",
+                            "Micromonas_polaris",
+                            #"Raphid-pennate_X_sp.",
+                            "Pseudo-nitzschia_seriata",
+                            #"Parmales_env_2_X_sp.",
+                            "Fragilariopsis_cylindrus",
+                            #"Bacillaria_paxillifer",
+                            "Baffinella_frigidus",
+                            "Navicula_sp.",
+                            #"Nitzschia_sp.",
+                            "Fragilaria_sp.",
+                            "Thalassiosira_nordenskioeldii", # have to manually move green dots forward
+                            "Thalassiosira_sp.",
+                            "Thalassiosira_antarctica",
+                            "Fragilariopsis_sublineata",
+                            "Chaetoceros_gelidus",
+                            "Attheya_septentrionalis",
+                            "Ankylochrysis_sp1.",
+                            "Porosira_sp.",
+                            "Cryptomonadales_XX_sp.")
+
+# import world map
+world <- map_data("world")
+
+##
+## Run GE_IC_biogeo from Lines 1 to 75 to get long_meta dataframe
+##
+
+for(i in top_phyto_species_asvs) {
+  i<-"Raphid-pennate_X_sp."
+species <- long_DNA %>% 
+  filter(species==i) %>%
+  group_by(asv_code,date,substrate,biogeo) %>%
+  summarize(n_reads=sum(n_reads)) %>%
+  mutate(asv_code=str_c(asv_code,"\n(",biogeo,")")) %>% 
+  filter(n_reads!=0)
+
+species_order <- species %>%
+  group_by(asv_code) %>%
+  summarize(n_reads=sum(n_reads)) %>%
+  arrange(desc(n_reads))
+
+species$asv_code <- factor(species$asv_code, levels=species_order$asv_code)
+
+plot_time <-  ggplot(species, aes(x=date, y=n_reads)) +
+  geom_bar(position="stack",stat="identity", color="black",aes(fill=asv_code)) +
+  theme_bw() +
+  scale_fill_manual(values=c("#009E73","#CC79A7", "#D55E00","#F0E442","#0072B2","#009E73","#CC79A7")) +
+        theme(text=element_text(size=20),
+              axis.text.x = element_text(angle = 45, hjust = 1), 
+              axis.title.x = element_blank(),            
+              legend.justification = "left", 
+             # legend.spacing.x=unit(1,"cm"),
+              legend.text = element_text(margin = margin(r=1.5,unit="cm")),
+              legend.key.size=unit(2,"line"), 
+              legend.position="bottom",
+              legend.title = element_blank(),
+              panel.spacing.x=unit(2, "lines"),
+              panel.spacing.y=unit(1, "lines"), 
+            #  plot.margin = unit(c(0,0,3,0), "cm"),
+              panel.grid = element_blank(),
+              strip.background=element_blank()) + 
+        ggtitle(str_c(i," ASVs"))  +  
+       # guides(fill=guide_legend(byrow=TRUE))  +
+  ylab("No. of reads") +
+  facet_grid(rows=vars(substrate),scales="free_x") 
+
+plot_time
+
+
+species <- long_DNA %>% 
+  filter(species==i) %>%
+  group_by(asv_code,casv_code,biogeo) %>%
+  summarize(n_reads=sum(n_reads)) %>%
+  select(asv_code,casv_code,biogeo)
+
+list<-species$casv_code
+
+species_distribution <- long_meta %>% 
+  filter(casv_code %in% list) %>%
+  left_join(species,by="casv_code") %>%
+  mutate(asv_code=str_c(asv_code,"\n(",biogeo,")"))
+
+plot_map_ortho<-ggplot() +
+  geom_map(data=world,
+           map=world,
+           aes(long,lat,map_id=region),
+            color="grey80", fill="#F2F2F2") +
+  scale_x_continuous(breaks = seq(-180, 180, by = 10)) +
+  scale_y_continuous(breaks= seq(0,90, by=10)) +
+  geom_hline(yintercept=66, color="#0072B2", linetype="dashed") +
+  geom_hline(yintercept=23, color="#D55E00", linetype="dashed") +
+  geom_point(data=species_distribution,
+             mapping=aes(x=longitude,y=latitude,color=asv_code),
+             show.legend = FALSE,size=3,alpha=0.7) +
+  scale_color_manual(values=c("#009E73","#CC79A7", "#D55E00","#F0E442","#0072B2","#009E73","#CC79A7"),breaks=species_order$asv_code) +
+  coord_map("ortho", ylim=c(30,90)) +
+  theme(axis.text=element_blank(), #remove axis labels
+        axis.ticks=element_blank(), #remove axis ticks
+        axis.title=element_blank(), # remove axis title
+        panel.border = element_rect(color="black", fill=NA, size=0.5),
+        panel.background = element_rect(fill="#cdebf9"),
+        panel.grid=element_line(size=0.4)) # long and lat line size
+plot_map_ortho
+
+plot_map_world<-ggplot() +
+  geom_map(data=world,
+           map=world,
+           aes(long,lat,map_id=region),
+            color="grey80", fill="#F2F2F2") +
+  geom_hline(yintercept=66, color="#0072B2", linetype="dashed") +
+  geom_hline(yintercept=23, color="#D55E00", linetype="dashed") +
+  geom_hline(yintercept=-66, color="#0072B2", linetype="dashed") +
+  geom_hline(yintercept=-23, color="#D55E00", linetype="dashed") +
+  geom_point(data=species_distribution,
+             mapping=aes(x=longitude,y=latitude,color=asv_code),
+             show.legend = FALSE,size=3,alpha=0.7) +
+  scale_color_manual(values=c("#009E73","#CC79A7", "#D55E00","#F0E442","#0072B2","#009E73","#CC79A7"),breaks=species_order$asv_code) +
+  theme(axis.text=element_blank(), #remove axis labels
+        axis.ticks=element_blank(), #remove axis ticks
+        axis.title=element_blank(), # remove axis title
+        panel.border = element_rect(color="black", fill=NA, size=0.5),
+        panel.background = element_rect(fill="#cdebf9"),
+        panel.grid=element_line(size=0)) # long and lat line size
+plot_map_world
+
+pdf(str_c("./GE_IC_unsorted_figs/supplementary_ASV_",i,".pdf"), height=8, width=24) ; plot(plot_time+plot_map_ortho+plot_map_world); dev.off() 
+}
+```
+nces,"../R_ice_camp/sequences.csv")
+```
