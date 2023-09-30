@@ -1,0 +1,279 @@
+---
+title: "GE_IC_biogeo"
+author: "Clarence Sim"
+date: "12/13/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# Ecosystems (coastal and marine)
+# substrate (ice and water)
+# depths (under-ice, surface, euphotic, composite)
+# size fraction (all)
+# dataset version 2.0, metapr2 1.0.4
+
+metaPR2_coastal <-readRDS("./metapr2_phyloseq_Eukaryota_2022-11-28_coastal.rds") 
+metaPR2_oceanic <-readRDS("./metapr2_phyloseq_Eukaryota_2022-11-28_oceanic.rds")
+  
+metaPR2 <- merge_phyloseq(metaPR2_coastal,metaPR2_oceanic)
+# 30026 ASVs
+# 2874 samples
+
+metaPR2_otus <- data.frame(otu_table(metaPR2))
+metaPR2_taxa <- data.frame(tax_table(metaPR2))
+metaPR2_samples <- data.frame(sample_data(metaPR2))
+row.names(metaPR2_samples) <- gsub("-",".",row.names(metaPR2_samples))
+
+colnames(metaPR2_otus) <- gsub("X","",colnames(metaPR2_otus))
+testsamples<-as.data.frame(colnames(metaPR2_otus))
+```
+
+#mapping GE ASVs to metaPR2 cASV
+
+```{r}
+
+metaPR2_taxa <- metaPR2_taxa %>% rownames_to_column("casv_code")
+
+metaPR2_samples$region <- ifelse(metaPR2_samples$latitude>=66, "Arctic",
+                         ifelse(metaPR2_samples$latitude>=23, "N_Temperate",
+                                ifelse(metaPR2_samples$latitude>-23,"Tropical",
+                                       ifelse(metaPR2_samples$latitude>-66,"S_Temperate","Antarctic"))))
+
+sample_info <- read_excel("./metapr2_datasets_Eukaryota_2022-11-28_coastal_oceanic/samples.xlsx") %>% select(file_code,longitude) 
+sample_info$file_code <- gsub("-",".",sample_info$file_code)
+
+metaPR2_samples <-  metaPR2_samples %>% rownames_to_column("file_code")
+metaPR2_samples <- left_join(metaPR2_samples,sample_info,by="file_code")
+
+    otu_df <- metaPR2_otus %>% rownames_to_column(var = "casv_code") %>%
+    pivot_longer(cols = -casv_code,
+                 names_to = "file_code",
+                 values_to = "n_reads",
+                 values_drop_na = TRUE) %>%
+    filter(n_reads != 0) %>%
+    filter(!is.na(n_reads))
+  taxo_df <- metaPR2_taxa
+  long_test <- left_join(otu_df,taxo_df)
+  metadata_df <- metaPR2_samples
+  
+ long_meta <- left_join(long_test, metadata_df, by = c("file_code"))
+ 
+ metaPR2_samples_count <- metaPR2_samples %>% 
+   group_by(region) %>% 
+   count()
+  
+#group samples by latlong to count time series as one occurence only.
+long_meta$latlong <- str_c(long_meta$latitude,long_meta$longitude,sep=",")
+```
+
+
+#casv
+
+```{r}
+
+collapse_timeseries <- long_meta %>% 
+  group_by(casv_code,region,latlong) %>%
+  summarize(n_reads=sum(n_reads))
+
+
+biogeo_casv_metapr2 <- collapse_timeseries %>% 
+  group_by(casv_code,region) %>% 
+  count() %>%
+  pivot_wider(names_from=region,values_from=n,values_fill=0) %>%
+  as.data.frame()
+
+#Remove if the ASV has less than 5 samples in a band
+biogeo_casv_metapr2[,-1][biogeo_casv_metapr2[,-1]<5] <- 0
+
+biogeo_casv_metapr2 <- biogeo_casv_metapr2 %>% 
+  mutate(n=rowSums(across(where(is.numeric)))) %>%
+  filter(n>=5)
+
+biogeo_casv_metapr2 <- biogeo_casv_metapr2 %>% 
+  mutate(Arctic_pct=Arctic/n) %>%
+  mutate(N_Temperate_pct=N_Temperate/n) %>%
+  mutate(Tropical_pct=Tropical/n) %>%
+  mutate(S_Temperate_pct=S_Temperate/n) %>%
+  mutate(Antarctic_pct=Antarctic/n) %>%
+  mutate(Temperate_pct=S_Temperate_pct+N_Temperate_pct) %>%
+  mutate(Polar_pct=Arctic_pct+Antarctic_pct)
+
+biogeo <- biogeo_casv_metapr2
+biogeo$biogeo<- ifelse(biogeo$Polar_pct>=0.9, "Polar",
+                             ifelse(biogeo$Temperate_pct>=0.9, "Temperate",
+                                    ifelse(biogeo$Tropical_pct>=0.9, "Tropical",
+                                           ifelse(biogeo$Temperate_pct+biogeo$Polar_pct>0.9, "Polar-Temperate",
+                                                  ifelse(biogeo$Tropical_pct+biogeo$Temperate_pct>0.9, "Temperate-Tropical", "Cosmopolitan")))))
+
+
+
+count <- biogeo %>% group_by(biogeo) %>% count()
+
+
+write.csv(biogeo,"./biogeo_casv.csv")
+
+###
+#entire MetaPR2 distribution
+###
+
+indic_biogeo <- biogeo %>% select(casv_code)
+
+
+distribution <- filter(long_meta,casv_code %in% indic_biogeo$casv_code) %>% group_by(casv_code,latlong,latitude,longitude) %>%
+summarize(n_reads=sum(n_reads)) %>%
+select(casv_code,latitude,longitude)
+
+distribution <- left_join(distribution,biogeo%>%select(casv_code,biogeo),by="casv_code") 
+distribution <- distribution %>% filter(!is.na(biogeo))
+count<-distribution %>% group_by(biogeo) %>% count()
+
+library(ggridges)
+theme_set(theme_minimal())
+
+distribution$biogeo <- factor(distribution$biogeo,levels=c("Cosmopolitan","Tropical","Temperate-Tropical","Temperate","Polar-Temperate","Polar"))
+
+density <- ggplot(distribution, aes(x = latitude, y = biogeo)) +
+  geom_density_ridges(aes(fill = biogeo,alpha=0.5)) +
+  scale_fill_manual(values=biogeoPalette) +
+  theme(legend.position = "none", axis.ticks.x = element_blank(), panel.grid=element_blank()) + scale_x_continuous(breaks=c(-66,-23,0,23,66)) + 
+  geom_vline(xintercept = c(23,-23,66,-66), linetype="dotted",alpha=0.7)
+density
+pdf("../main_figures/metaPR2_biogeo_density.pdf", height=7, width=8); plot(density); dev.off() 
+
+```
+
+# Make map of all samples I used
+```{r}
+# import world map
+world <- map_data("world")
+
+plot_world <- metaPR2_samples %>%
+  select(file_code,latitude,longitude,region)
+plot_world$biogeo<-ifelse(plot_world$region=="N_Temperate" | plot_world$region=="S_Temperate", "Temperate",
+                          ifelse(plot_world$region=="Arctic" | plot_world$region=="Antarctic", "Polar", 
+                                 "Tropical"))
+
+plot_map_ortho<-ggplot() +
+  geom_map(data=world, map=world, aes(long,lat,map_id=region), color="grey80", fill="#F2F2F2") +
+  scale_x_continuous(breaks = seq(-180, 180, by = 10)) +
+  scale_y_continuous(breaks= seq(0,90, by=10)) +
+    geom_hline(yintercept=66, color="#0072B2", linetype="dashed") +
+  geom_hline(yintercept=23, color="#D55E00", linetype="dashed") +
+  geom_point(data=plot_world,
+             mapping=aes(x=longitude,y=latitude,color=biogeo),
+             show.legend = FALSE,size=1.5,alpha=0.6) +
+  scale_color_manual(values=biogeoPalette,breaks=c("Polar","Temperate","Tropical")) +
+  coord_map("ortho", ylim=c(30,90)) +
+  theme(axis.text=element_blank(), #remove axis labels
+        axis.ticks=element_blank(), #remove axis ticks
+        axis.title=element_blank(), # remove axis title
+        panel.border = element_rect(color="black", fill=NA, size=0.5),
+        panel.background = element_rect(fill="#cdebf9"),
+        panel.grid=element_line(size=0.4)) # long and lat line size
+plot_map_ortho
+
+
+plot_map_world<-ggplot() +
+  geom_map(data=world,
+           map=world,
+           aes(long,lat,map_id=region),
+            color="grey80", fill="#F2F2F2") +
+    geom_hline(yintercept=66, color="#0072B2", linetype="dashed") +
+  geom_hline(yintercept=23, color="#D55E00", linetype="dashed") +
+  geom_hline(yintercept=-66, color="#0072B2", linetype="dashed") +
+  geom_hline(yintercept=-23, color="#D55E00", linetype="dashed") +
+  geom_point(data=plot_world,
+             mapping=aes(x=longitude,y=latitude,color=biogeo),
+             show.legend = TRUE,size=1.5,alpha=0.7) +
+  scale_color_manual(values=biogeoPalette,breaks=c("Polar","Temperate","Tropical"),name="Region") +
+  theme(axis.text=element_blank(), #remove axis labels
+        axis.ticks=element_blank(), #remove axis ticks
+        axis.title=element_blank(), # remove axis title
+        legend.text = element_text(margin = margin(r=1,unit="cm")),
+        legend.position="bottom",
+        legend.title=element_blank(),
+        text=element_text(size=16),
+        panel.border = element_rect(color="black", fill=NA, size=0.5),
+        panel.background = element_rect(fill="#cdebf9"),
+        panel.grid=element_line(size=0)) # long and lat line size
+plot_map_world
+
+pdf("../../supplementary_figures/supplementary_metaPR2_samples.pdf", height=6, width=14) ; plot(plot_map_ortho+plot_map_world); dev.off() 
+```
+
+# Density plot for global distribution of GE cASVs
+```{r}
+#occurrence only, dont count proportion of reads within its sample
+
+indic_biogeo <- read.csv("../../supplementary_tables/photosynthetic_ASVs_TAXONtable.csv") %>% 
+  select(casv_code)
+
+distribution <- filter(long_meta,casv_code %in% indic_biogeo$casv_code) %>% group_by(casv_code,latlong,latitude,longitude) %>%
+summarize(n_reads=sum(n_reads)) %>%
+select(casv_code,latitude,longitude)
+
+distribution <- left_join(distribution,biogeo%>%select(casv_code,biogeo),by="casv_code") 
+
+distribution <- distribution %>% filter(!is.na(biogeo))
+count <- left_join(indic_biogeo,biogeo%>%select(casv_code,biogeo),by="casv_code")
+count<-count %>% group_by(biogeo) %>% count()
+
+theme_set(theme_minimal())
+
+distribution$biogeo <- factor(distribution$biogeo,levels=c("Cosmopolitan","Tropical","Temperate-Tropical","Temperate","Polar-Temperate","Polar"))
+
+#filter away counts that are less than 5 in the latitudinal zone 
+distribution_filtered <- distribution %>% 
+  left_join(biogeo_casv_metapr2,by="casv_code")
+
+distribution_filtered$remove <- ifelse(distribution_filtered$latitude>=66 & distribution_filtered$Arctic==0, "remove",
+                         ifelse(distribution_filtered$latitude<66 & distribution_filtered$latitude>=23 & distribution_filtered$N_Temperate==0,"remove",
+                                ifelse(distribution_filtered$latitude<23 & distribution_filtered$latitude>-23 & distribution_filtered$Tropical==0,"remove",
+                                       ifelse(distribution$latitude<=-23 & distribution_filtered$latitude>-66 & distribution_filtered$S_Temperate==0,"remove",
+                                              ifelse(distribution_filtered$latitude<=-66 & distribution_filtered$Antarctic==0,"remove","stay")))))
+
+distribution_filtered <- distribution_filtered %>% 
+  filter(remove=="stay") %>%
+  select(casv_code,latitude,longitude,biogeo)
+
+density <- ggplot(distribution_filtered, aes(x = latitude, y = biogeo)) +
+  geom_density_ridges(aes(fill = biogeo,alpha=0.5)) +
+  scale_fill_manual(values=biogeoPalette) +
+  theme(legend.position = "none", axis.ticks.x = element_blank(), panel.grid=element_blank()) + scale_x_continuous(breaks=c(-66,-23,0,23,66)) + 
+  geom_vline(xintercept = c(23,-23,66,-66), linetype="dotted",alpha=0.7)
+density
+pdf("../../main_figures/biogeo_density.pdf", height=5, width=8); plot(density); dev.off() 
+
+```
+
+#Map of cASVs of the GE ASVs (same as above, but as a map)
+```{r}
+for(i in c("Polar","Polar-Temperate","Temperate","Cosmopolitan")){
+plot_GE_world<-ggplot() +
+  geom_map(data=world,
+           map=world,
+           aes(long,lat,map_id=region),
+            color="grey80", fill="#F2F2F2") +
+    geom_hline(yintercept=66, color="#0072B2", linetype="dashed") +
+  geom_hline(yintercept=23, color="#D55E00", linetype="dashed") +
+  geom_hline(yintercept=-66, color="#0072B2", linetype="dashed") +
+  geom_hline(yintercept=-23, color="#D55E00", linetype="dashed") +
+  geom_point(data=distribution_filtered%>%filter(biogeo==i),
+             mapping=aes(x=longitude,y=latitude,color=biogeo),
+             show.legend = FALSE,size=1.5,alpha=0.7) +
+  scale_color_manual(values=biogeoPalette) +
+  theme(axis.text=element_blank(), #remove axis labels
+        axis.ticks=element_blank(), #remove axis ticks
+        axis.title=element_blank(), # remove axis title
+        text=element_text(size=16),
+        panel.border = element_rect(color="black", fill=NA, size=0.5),
+        panel.background = element_rect(fill="#cdebf9"),
+        panel.grid=element_line(size=0)) # long and lat line size
+plot_GE_world
+
+pdf(str_c("../../supplementary_figures/supplementary_GE_distribution_",i,".pdf"), height=5, width=10) ; plot(plot_GE_world); dev.off() 
+}
+```
+
