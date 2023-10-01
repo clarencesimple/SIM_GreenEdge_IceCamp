@@ -4,13 +4,13 @@ library(here)
 library(purrr)
 
 # Original pr2 taxonomy file
-file_pr2_taxonomy = here("R_ice_camp/data/pr2_taxonomy_4.14.0.xlsx")
+file_pr2_taxonomy = here("/pr2_taxonomy_4.14.0.xlsx")
 
 # PR2 taxonomy file with trophic mode
-file_pr2_trophic = here("R_ice_camp/data/pr2_trophic.xlsx")
+file_pr2_trophic = here("/pr2_trophic.xlsx")
 
 # File with trophic mode.  Each time it is update run this script again
-file_trophic_mode = here("R_ice_camp/data/trophic_mode_updated.xlsx")
+file_trophic_mode = here("/trophic_mode_updated.xlsx")
 
 # File with majority rules from Schneider2020
 # file_majority_rules= here("schneider_majority_rules.csv")
