@@ -29,7 +29,7 @@ library(pracma)
 library(vegan)
 
 # load PS file and removing non-protist
-ps_unsorted <- readRDS("../R_Ice_camp/metabarcoding/metapr2_phyloseq_asv_set_21_22_23_Eukaryota_2021-11-11.rds") %>% 
+ps_unsorted <- readRDS("../R_Ice_camp/metabarcoding/GE_IC_phyloseq_datasets_21_22_23.rds") %>% 
   subset_samples(dataset_id=="21") %>%
   subset_taxa(!(division %in% c("Metazoa", "Fungi","Rhodophyta")) & 
                 !(class %in% c("Phaeophyceae","Embryophyceae","Opisthokonta_XX")) &
