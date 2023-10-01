@@ -5,6 +5,7 @@ Sim C.W.H., Ribeiro C.G., Le Gall F., Marie D., Probert I., Gourvil P., Lovejoy 
 
 ## R_ice_camp
 All files involved in generating figures and data used in this study
+List of packages used across all R files are listed in  [GE_IC_read_phyloseq.R](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/GE_IC_read_phyloseq.R). Please make sure to install packages before running. Scripts are written using relative file paths, no changes any file paths are required upon cloning this repository.
 
 * Main script for figures - [GE_IC_main.Rmd](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/GE_IC_main.Rmd)
      * [GE_IC_read_phyloseq.R](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/GE_IC_read_phyloseq.R) Sub-script for loading libraries and reading phyloseq file
