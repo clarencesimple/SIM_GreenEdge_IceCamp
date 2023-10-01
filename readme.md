@@ -1,9 +1,9 @@
 # GreenEdge Ice Camp Autotrophs
 
-Scripts and data for: \
-Sim C.W.H., Ribeiro C.G., Le Gall F., Marie D., Probert I., Gourvil P., Lovejoy C., Vaulot D. & Lopes dos Santos, A. (2023). Temporal dynamics and biogeography of sympagic and planktonic autotrophic microbial eukaryotes during under-ice Arctic bloom. (in prep) \ 
-&nbsp;
-&nbsp;
+Scripts and data for:  
+Sim C.W.H., Ribeiro C.G., Le Gall F., Marie D., Probert I., Gourvil P., Lovejoy C., Vaulot D. & Lopes dos Santos, A. (2023). Temporal dynamics and biogeography of sympagic and planktonic autotrophic microbial eukaryotes during under-ice Arctic bloom. (in prep)  
+  
+  
 List of packages used across all R files are listed in  [GE_IC_read_phyloseq.R](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/GE_IC_read_phyloseq.R). Please make sure to install packages before running. Scripts are written using relative file paths, no changes any file paths are required upon cloning this repository.
 
 ## R_ice_camp
