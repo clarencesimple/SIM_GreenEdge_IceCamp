@@ -7,7 +7,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 # Ecosystems (coastal and marine)
 # substrate (ice and water)
 # depths (under-ice, surface, euphotic, composite)
@@ -66,6 +66,8 @@ metaPR2_samples <- left_join(metaPR2_samples,sample_info,by="file_code")
   
 #group samples by latlong to count time series as one occurence only.
 long_meta$latlong <- str_c(long_meta$latitude,long_meta$longitude,sep=",")
+
+write.csv(long_meta, gzfile("./metapr2_long.csv.gz"))
 ```
 
 

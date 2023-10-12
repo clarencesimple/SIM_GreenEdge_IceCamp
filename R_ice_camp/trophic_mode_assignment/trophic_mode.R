@@ -2,6 +2,7 @@ library(dplyr)
 library(rio)
 library(here)
 library(purrr)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 # Original pr2 taxonomy file
 file_pr2_taxonomy = here("/pr2_taxonomy_4.14.0.xlsx")
@@ -12,21 +13,11 @@ file_pr2_trophic = here("/pr2_trophic.xlsx")
 # File with trophic mode.  Each time it is update run this script again
 file_trophic_mode = here("/trophic_mode_updated.xlsx")
 
-# File with majority rules from Schneider2020
-# file_majority_rules= here("schneider_majority_rules.csv")
 
-pr2_taxonomy <- import(file_pr2_taxonomy, guess_max = 100000) #%>% 
-  #select(-contains("taxo_"), -reference)
+pr2_taxonomy <- import(file_pr2_taxonomy, guess_max = 100000) 
 trophic_mode <- import(file_trophic_mode, guess_max = 10000) %>% 
   select(taxon_name, taxon_level, trophic_mode)
-# majority_rules <- read.csv(file_majority_rules) %>% 
-#  select(taxon_name, taxon_level, dominantTrophy) 
-# renaming the header to taxon_name
-# names(majority_rules)[names(majority_rules) == "dominantTrophy"] <- "trophic_mode"
 
-# Add majority rules to trophic_mode, but removing those already allocated
-#majority_rules_exclusive<-anti_join(majority_rules,trophic_mode,by=c("taxon_level","taxon_name"))
-#trophic_mode<-rbind(trophic_mode,majority_rules_exclusive)
 
 pr2_trophic_list <- list()
 taxon_levels <- c("species", "genus", "family", "order", "class" , "division", "supergroup")

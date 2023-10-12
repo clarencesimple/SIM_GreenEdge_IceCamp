@@ -62,6 +62,13 @@ biogeo<-read.csv("../R_ice_camp/biogeoraphy_assignment_metaPR2/biogeo_casv.csv")
 taxa<-left_join(taxa,biogeo, by="casv_code") 
 taxa$biogeo <- ifelse(is.na(taxa$biogeo)==TRUE, "Unallocated", taxa$biogeo) 
 
+# add dada2 PR2 boostrap and DNA sequence
+bootstrap <- read_excel("../R_ice_camp/metabarcoding/GE_IC_TAXONtable_datasets_21_22_23.xlsx") %>% 
+  select(asv_code,kingdom_boot:species_boot,sequence) %>%
+  mutate(across(kingdom_boot:species_boot,as.numeric))
+bootstrap$asv_code <-substr(bootstrap$asv_code,1,10)
+taxa<-left_join(taxa,bootstrap, by="asv_code")   
+                         
 
 taxa <- taxa %>%column_to_rownames("asv_code")
 

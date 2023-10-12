@@ -27,6 +27,7 @@ library(tidyverse)
 library(ggmap)
 library(pracma)
 library(vegan)
+library(xtable) 
 
 # load PS file and removing non-protist
 ps_unsorted <- readRDS("../R_Ice_camp/metabarcoding/GE_IC_phyloseq_datasets_21_22_23.rds") %>% 
