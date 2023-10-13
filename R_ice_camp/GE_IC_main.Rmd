@@ -598,7 +598,6 @@ indic_phyto_ice <- long_phyto_ice %>%
 indic_phyto_ice <- left_join(indic_phyto_ice, taxa, by="asv_code")
 indic_phyto_ice$substrate <- "ice"
 indic_phyto_ice <- left_join(indic_phyto_ice, indic_substrate, by=c("asv_code","substrate"))
-indic_phyto_ice <- filter(indic_phyto_ice,as.numeric(indic_phyto_ice$species_boot)>=80)
 
 indic_phyto_water <- long_phyto_water %>%
   group_by(asv_code) %>%
@@ -607,14 +606,17 @@ indic_phyto_water <- long_phyto_water %>%
 indic_phyto_water <- left_join(indic_phyto_water, taxa, by="asv_code")
 indic_phyto_water$substrate <- "water"
 indic_phyto_water <- left_join(indic_phyto_water, indic_substrate, by=c("asv_code","substrate"))
-indic_phyto_water <- filter(indic_phyto_water,as.numeric(indic_phyto_water$species_boot)>=80)
 
 indic_substrate_top<-rbind(indic_phyto_ice[1:20,],indic_phyto_water[1:20,])
+unique(indic_substrate_top$class)
 
 indic_substrate_top$asv_code<-ifelse(as.numeric(indic_substrate_top$PR2_matches)>0,str_c("B",indic_substrate_top$asv_code),indic_substrate_top$asv_code)
 indic_substrate_top$species<-gsub("_"," ",indic_substrate_top$species)
-unique(indic_substrate_top$class)
-indic_substrate_plot<-lollipop_chart(indic_substrate_top,asv_code,total_reads,facet=substrate, color=class, pch=biogeo,line_size=0.5, point_size=7) +
+
+# Checking for boostrap values to make sure taxa name is accurate
+kable(indic_substrate_top%>%select(species,family_boot,genus_boot,species_boot,substrate))
+
+indic_substrate_plot<-lollipop_chart(indic_substrate_top,asv_code,total_reads,facet=substrate, color=division, pch=biogeo,line_size=0.5, point_size=7) +
   theme_bw() +
   ylab("Total number of DNA reads of ASVs within substrate") +
   theme(text=element_text(size=24),
@@ -623,17 +625,17 @@ indic_substrate_plot<-lollipop_chart(indic_substrate_top,asv_code,total_reads,fa
         axis.title.y = element_blank(),
         legend.position="top",
         legend.spacing.y=unit(2,"lines"),
-        legend.key.size = unit(3,"lines"),
+        legend.key.size = unit(2,"lines"),
         legend.text = element_text(margin = margin(r=1,unit="cm")),
         panel.grid=element_blank(),
         panel.spacing.x=unit(2, "lines"),
         strip.background=element_blank(),
         panel.background = element_rect(fill="white")) +
-  scale_y_log10(limits=c(316,3162277), expand = c(0, 0), breaks = scales::trans_breaks("log10", function(x) 10^x),labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  scale_y_log10(limits=c(1e3,3162277), expand = c(0, 0), breaks = scales::trans_breaks("log10", function(x) 10^x),labels = scales::trans_format("log10", scales::math_format(10^.x))) +
   geom_text(aes(x=asv_code,y=total_reads,label=species),size=8,hjust=0, nudge_y=0.07,show.legend = FALSE,fontface="italic",family="Helvetica") +
   geom_text(aes(x=asv_code,y=total_reads,label=sig),size=8,vjust=-0.4,show.legend = FALSE) +
-  guides(color=guide_legend(ncol=4, title.position = "top"), shape=guide_legend(ncol=1,title.position="top")) +
-  scale_color_manual(values=classPalette, breaks=unique(indic_substrate_top$class), name="Class") +
+  guides(color=guide_legend(ncol=1, title.position = "top"), shape=guide_legend(ncol=1,title.position="top")) +
+  scale_color_manual(values=treePalette, name="Division") +
   scale_shape_manual(values=biogeoShapes, name="Biogeographic Distribution", breaks=c("Polar","Polar-Temperate","Cosmopolitan","Unallocated"))
 
 indic_substrate_plot
@@ -656,7 +658,6 @@ indic_phyto_Stage_I <- long_phyto_Stage_I %>%
 indic_phyto_Stage_I <- left_join(indic_phyto_Stage_I, taxa, by="asv_code")
 indic_phyto_Stage_I$bloom_cluster <- "Stage_I"
 indic_phyto_Stage_I <- left_join(indic_phyto_Stage_I, indic_bloom_cluster, by=c("asv_code","bloom_cluster"))
-indic_phyto_Stage_I <- filter(indic_phyto_Stage_I,as.numeric(indic_phyto_Stage_I$species_boot)>=80)
 
 indic_phyto_Stages_II_and_III <- long_phyto_Stages_II_and_III %>%
   group_by(asv_code) %>%
@@ -665,14 +666,16 @@ indic_phyto_Stages_II_and_III <- long_phyto_Stages_II_and_III %>%
 indic_phyto_Stages_II_and_III <- left_join(indic_phyto_Stages_II_and_III, taxa, by="asv_code")
 indic_phyto_Stages_II_and_III$bloom_cluster <- "Stages_II_and_III"
 indic_phyto_Stages_II_and_III <- left_join(indic_phyto_Stages_II_and_III, indic_bloom_cluster, by=c("asv_code","bloom_cluster"))
-indic_phyto_Stages_II_and_III <- filter(indic_phyto_Stages_II_and_III,as.numeric(indic_phyto_Stages_II_and_III$species_boot)>=80)
 
 indic_bloom_cluster_top<-rbind(indic_phyto_Stage_I[1:20,],indic_phyto_Stages_II_and_III[1:20,])
 
 indic_bloom_cluster_top$asv_code<-ifelse(as.numeric(indic_bloom_cluster_top$PR2_matches)>0,str_c("B",indic_bloom_cluster_top$asv_code),indic_bloom_cluster_top$asv_code)
 indic_bloom_cluster_top$species<-gsub("_"," ",indic_bloom_cluster_top$species)
 
-indic_bloom_cluster_plot<-lollipop_chart(indic_bloom_cluster_top,asv_code,total_reads,facet=bloom_cluster, color=class, pch=biogeo,line_size=0.5, point_size=7) +
+# Checking for boostrap values to make sure taxa name is accurate
+kable(indic_bloom_cluster_top%>%select(species,family_boot,genus_boot,species_boot,bloom_cluster))
+
+indic_bloom_cluster_plot<-lollipop_chart(indic_bloom_cluster_top,asv_code,total_reads,facet=bloom_cluster, color=division, pch=biogeo,line_size=0.5, point_size=7) +
   theme_bw() +
   ylab("Total number of DNA reads of ASVs within bloom_cluster") +
   theme(text=element_text(size=24),
@@ -687,11 +690,11 @@ indic_bloom_cluster_plot<-lollipop_chart(indic_bloom_cluster_top,asv_code,total_
         panel.spacing.x=unit(2, "lines"),
         strip.background=element_blank(),
         panel.background = element_rect(fill="white")) +
-  scale_y_log10(limits=c(316,3162277), expand = c(0, 0), breaks = scales::trans_breaks("log10", function(x) 10^x),labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  scale_y_log10(limits=c(1e3,3162277), expand = c(0, 0), breaks = scales::trans_breaks("log10", function(x) 10^x),labels = scales::trans_format("log10", scales::math_format(10^.x))) +
   geom_text(aes(x=asv_code,y=total_reads,label=species),size=8,hjust=0, nudge_y=0.07,show.legend = FALSE,fontface="italic",family="Helvetica") +
   geom_text(aes(x=asv_code,y=total_reads,label=sig),size=8,vjust=-0.4,show.legend = FALSE) +
-  guides(color=guide_legend(ncol=3, title.position = "top"), shape=guide_legend(ncol=2,title.position="top")) +
-  scale_color_manual(values=classPalette, breaks=unique(indic_bloom_cluster_top$class), name="Class") +
+  guides(color=guide_legend(ncol=1, title.position = "top"), shape=guide_legend(ncol=1,title.position="top")) +
+  scale_color_manual(values=treePalette, name="Division") +
   scale_shape_manual(values=biogeoShapes, name="Biogeographic Distribution", breaks=c("Polar","Polar-Temperate","Cosmopolitan","Unallocated"))
 
 indic_bloom_cluster_plot
@@ -864,7 +867,7 @@ DNA_ice_SEM <- long_DNA_ice %>%
   summarise(n_reads=sum(n_reads), Nasv=n()) %>%
   mutate(pct_reads = (n_reads/total_ice_phyto_reads)*100)
 
-xtable(DNA_ice_SEM)
+#xtable(DNA_ice_SEM)
 
 total_water_phyto_reads <- sum(long_DNA_water$n_reads)
 
@@ -878,7 +881,7 @@ DNA_water_SEM <- long_DNA_water %>%
   mutate(pct_reads = (n_reads/total_water_phyto_reads)*100) %>%
   select(-n_reads)
 
-xtable(DNA_water_SEM)
+#xtable(DNA_water_SEM)
 
 ```
 
@@ -886,38 +889,42 @@ xtable(DNA_water_SEM)
 
 ```{r fig.height=5, fig.width=5}
 
-#species that appeared in Fig
-top_phyto_species_asvs <- c(#"Micromonas_polaris",
+#ASVs that appeared in Fig5
+indic_bloom_cluster_top<-rbind(indic_phyto_Stage_I[1:20,],indic_phyto_Stages_II_and_III[1:20,])
+indic_substrate_top<-rbind(indic_phyto_ice[1:20,],indic_phyto_water[1:20,])
+
+microdiversity_asvs <- c("Baffinella_frigidus",
+                            "Thalassiosira_nordenskioeldii",
                             "Navicula_sp.")
-                            #"Parmales_env_1_X_sp.",
-                            #"Pedinellales_X_sp.")
-                            
+
+mapPalette<-c("#0072B2","#E69F00","#555555")
+names(mapPalette)<-c("Polar","Polar-Temperate","Unallocated")
+
 # import world map
 world <- map_data("world")
-
 #distribution of samples from metaPR2
 long_meta <- read.csv("./biogeoraphy_assignment_metaPR2/metapr2_long.csv.gz")
 
-for(i in top_phyto_species_asvs) {
-
+for(i in microdiversity_asvs) {
 species <- long_DNA %>% 
-  filter(species==i & as.numeric(species_boot)>=80) %>%
+  filter(species==i) %>%
+  filter(asv_code %in% indic_substrate_top$asv_code | asv_code %in% indic_bloom_cluster_top$asv_code) %>%
   group_by(asv_code,date,substrate,biogeo) %>%
   summarize(n_reads=sum(n_reads)) %>%
   mutate(asv_code=str_c(asv_code,"\n(",biogeo,")")) %>% 
   filter(n_reads!=0)
 
 species_order <- species %>%
-  group_by(asv_code) %>%
+  group_by(asv_code,biogeo) %>%
   summarize(n_reads=sum(n_reads)) %>%
-  arrange(desc(n_reads))
+  arrange(desc(biogeo)) #Plots polar-temperate first, so polar points appear on top overlapping
 
 species$asv_code <- factor(species$asv_code, levels=species_order$asv_code)
 
 plot_time <-  ggplot(species, aes(x=date, y=n_reads)) +
   geom_bar(position="stack",stat="identity", color="black",aes(fill=biogeo)) +
   theme_bw() +
-  scale_fill_manual(values=biogeoPalette) +
+  scale_fill_manual(values=mapPalette) +
         theme(text=element_text(size=20),
               axis.text.x = element_text(angle = 45, hjust = 1), 
               axis.title.x = element_blank(),            
@@ -951,7 +958,8 @@ list<-species$casv_code
 species_distribution <- long_meta %>% 
   filter(casv_code %in% list) %>%
   left_join(species,by="casv_code") %>%
-  mutate(asv_code=str_c(asv_code,"\n(",biogeo,")"))
+  mutate(asv_code=str_c(asv_code,"\n(",biogeo,")")) %>%
+  arrange(desc(biogeo)) #Plots polar-temperate first, so polar points appear on top overlapping
 
 plot_map_ortho<-ggplot() +
   geom_map(data=world,
@@ -965,7 +973,7 @@ plot_map_ortho<-ggplot() +
   geom_point(data=species_distribution,
              mapping=aes(x=longitude,y=latitude,color=biogeo),
              show.legend = FALSE,size=3,alpha=0.7) +
-  scale_color_manual(values=biogeoPalette) +
+  scale_color_manual(values=mapPalette) +
   coord_map("ortho", ylim=c(30,90)) +
   theme(axis.text=element_blank(), #remove axis labels
         axis.ticks=element_blank(), #remove axis ticks
@@ -987,7 +995,7 @@ plot_map_world<-ggplot() +
   geom_point(data=species_distribution,
              mapping=aes(x=longitude,y=latitude,color=biogeo),
              show.legend = FALSE,size=3,alpha=0.7) +
-  scale_color_manual(values=biogeoPalette) +
+  scale_color_manual(values=mapPalette) +
   theme(axis.text=element_blank(), #remove axis labels
         axis.ticks=element_blank(), #remove axis ticks
         axis.title=element_blank(), # remove axis title
