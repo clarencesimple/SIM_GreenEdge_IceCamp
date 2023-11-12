@@ -47,11 +47,13 @@ phyloseq_long_treemap <- function(df, group1, group2, title) {
   g_treemap <- ggplot(df, aes(area = n_reads,
                               fill = {{group1}},
                               label = {{group2}},
-                              subgroup = {{group1}})) +
+                              subgroup = {{group1}},
+                              subgroup2= {{group2}})) +
     ggtitle(title) +
     treemapify::geom_treemap() +
-    treemapify::geom_treemap_subgroup_border() +
-    treemapify::geom_treemap_text(colour = "black", alpha=0.8, fontface="italic", place = "topleft", reflow = TRUE,
+    treemapify::geom_treemap_subgroup2_border(color="darkgrey",size=3) +
+    treemapify::geom_treemap_subgroup_border(color="black",size=5) +
+    treemapify::geom_treemap_text(colour = "black", alpha=0.8, place = "topleft", reflow = TRUE,
                                   padding.x =  grid::unit(3, "mm"),
                                   padding.y = grid::unit(3, "mm") ) +
     treemapify::geom_treemap_subgroup_text(place = "centre", grow = FALSE, reflow=TRUE, alpha = 0.9, colour =
@@ -62,27 +64,4 @@ phyloseq_long_treemap <- function(df, group1, group2, title) {
   return(g_treemap)
 }
 
-# Treemaps function for functional traits
 
-phyloseq_long_treemap_functional <- function(df, group1, group2, title) {
-  
-  df <- df %>%
-    group_by({{group1}}, {{group2}}) %>%
-    summarise(n_reads=sum(n_reads, na.rm = TRUE))
-  g_treemap <- ggplot(df, aes(area = n_reads,
-                              fill = {{group1}},
-                              label = {{group2}},
-                              subgroup = {{group1}})) +
-    ggtitle(title) +
-    treemapify::geom_treemap() +
-    treemapify::geom_treemap_subgroup_border() +
-    treemapify::geom_treemap_text(colour = "black", alpha=0.8, fontface="italic", place = "topleft", reflow = TRUE,
-                                  padding.x =  grid::unit(3, "mm"),
-                                  padding.y = grid::unit(3, "mm") ) +
-    treemapify::geom_treemap_subgroup_text(place = "centre", grow = FALSE, reflow=TRUE, alpha = 0.9, colour =
-                                             "white", size=24) +
-    scale_fill_manual(values=trophicPalette) + 
-    theme(legend.position="none", plot.title = element_text(size = 18, face = "bold"))
-  print(g_treemap)
-  return(g_treemap)
-}

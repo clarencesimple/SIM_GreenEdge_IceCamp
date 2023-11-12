@@ -74,7 +74,7 @@ write.csv(long_meta, gzfile("./metapr2_long.csv.gz"))
 #casv
 
 ```{r}
-
+long_meta<-read.csv(gzfile("./metapr2_long.csv.gz"))
 collapse_timeseries <- long_meta %>% 
   group_by(casv_code,region,latlong) %>%
   summarize(n_reads=sum(n_reads))
@@ -109,7 +109,7 @@ biogeo$biogeo<- ifelse(biogeo$Polar_pct>=0.9, "Polar",
                                            ifelse(biogeo$Temperate_pct+biogeo$Polar_pct>0.9, "Polar-Temperate",
                                                   ifelse(biogeo$Tropical_pct+biogeo$Temperate_pct>0.9, "Temperate-Tropical", "Cosmopolitan")))))
 
-
+biogeo$biogeo<- ifelse(biogeo$Polar_pct>=0.05 & biogeo$Temperate_pct>=0.05 & biogeo$Tropical_pct>=0.05, "Cosmopolitan", biogeo$biogeo)
 
 count <- biogeo %>% group_by(biogeo) %>% count()
 
@@ -142,7 +142,7 @@ density <- ggplot(distribution, aes(x = latitude, y = biogeo)) +
   theme(legend.position = "none", axis.ticks.x = element_blank(), panel.grid=element_blank()) + scale_x_continuous(breaks=c(-66,-23,0,23,66)) + 
   geom_vline(xintercept = c(23,-23,66,-66), linetype="dotted",alpha=0.7)
 density
-pdf("../main_figures/metaPR2_biogeo_density.pdf", height=7, width=8); plot(density); dev.off() 
+#pdf("../main_figures/metaPR2_biogeo_density.pdf", height=7, width=8); plot(density); dev.off() 
 
 ```
 
@@ -238,44 +238,26 @@ distribution_filtered$remove <- ifelse(distribution_filtered$latitude>=66 & dist
 
 distribution_filtered <- distribution_filtered %>% 
   filter(remove=="stay") %>%
-  select(casv_code,latitude,longitude,biogeo)
+  select(casv_code,latitude,longitude,biogeo) %>%
+  left_join(count,by="biogeo") %>%
+  mutate(biogeo_label=str_c(biogeo,"\n (N = ",n,")")) %>%
+  mutate(biogeo_label=factor(biogeo_label,levels=c("Cosmopolitan\n (N = 22)",
+                                                   "Temperate\n (N = 8)",
+                                                   "Polar-Temperate\n (N = 94)",
+                                                   "Polar\n (N = 136)")))
 
-density <- ggplot(distribution_filtered, aes(x = latitude, y = biogeo)) +
+
+density <- ggplot(distribution_filtered, aes(x = latitude, y = biogeo_label)) +
   geom_density_ridges(aes(fill = biogeo,alpha=0.5)) +
   scale_fill_manual(values=biogeoPalette) +
-  theme(legend.position = "none", axis.ticks.x = element_blank(), panel.grid=element_blank()) + scale_x_continuous(breaks=c(-66,-23,0,23,66)) + 
+  theme(legend.position = "none", 
+        axis.ticks.x = element_blank(), 
+        panel.grid = element_blank(),
+        axis.title.y = element_blank()) + 
+  scale_x_continuous(breaks=c(-66,-23,0,23,66)) + 
   geom_vline(xintercept = c(23,-23,66,-66), linetype="dotted",alpha=0.7)
 density
 pdf("../../main_figures/biogeo_density.pdf", height=5, width=8); plot(density); dev.off() 
 
-```
-
-#Map of cASVs of the GE ASVs (same as above, but as a map)
-```{r}
-for(i in c("Polar","Polar-Temperate","Temperate","Cosmopolitan")){
-plot_GE_world<-ggplot() +
-  geom_map(data=world,
-           map=world,
-           aes(long,lat,map_id=region),
-            color="grey80", fill="#F2F2F2") +
-    geom_hline(yintercept=66, color="#0072B2", linetype="dashed") +
-  geom_hline(yintercept=23, color="#D55E00", linetype="dashed") +
-  geom_hline(yintercept=-66, color="#0072B2", linetype="dashed") +
-  geom_hline(yintercept=-23, color="#D55E00", linetype="dashed") +
-  geom_point(data=distribution_filtered%>%filter(biogeo==i),
-             mapping=aes(x=longitude,y=latitude,color=biogeo),
-             show.legend = FALSE,size=1.5,alpha=0.7) +
-  scale_color_manual(values=biogeoPalette) +
-  theme(axis.text=element_blank(), #remove axis labels
-        axis.ticks=element_blank(), #remove axis ticks
-        axis.title=element_blank(), # remove axis title
-        text=element_text(size=16),
-        panel.border = element_rect(color="black", fill=NA, size=0.5),
-        panel.background = element_rect(fill="#cdebf9"),
-        panel.grid=element_line(size=0)) # long and lat line size
-plot_GE_world
-
-pdf(str_c("../../supplementary_figures/supplementary_GE_distribution_",i,".pdf"), height=5, width=10) ; plot(plot_GE_world); dev.off() 
-}
 ```
 
