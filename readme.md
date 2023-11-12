@@ -2,7 +2,7 @@
 
 Scripts and data for:  
   
-Sim C.W.H., Ribeiro C.G., Le Gall F., Marie D., Probert I., Gourvil P., Lovejoy C., Vaulot D. & Lopes dos Santos, A. (2023). Temporal dynamics and biogeography of sympagic and planktonic autotrophic microbial eukaryotes during under-ice Arctic bloom. (in prep)  
+Sim C.W.H., Ribeiro C.G., Le Gall F., Marie D., Probert I., Gourvil P., Lovejoy C., Vaulot D. & Lopes dos Santos, A. (2024). Temporal dynamics and biogeography of sympagic and planktonic autotrophic microbial eukaryotes during under-ice Arctic bloom. (in prep)  
   
 List of packages used across all R files are listed in  [GE_IC_read_phyloseq.R](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/GE_IC_read_phyloseq.R). Please make sure to install packages before running. Scripts are written using relative file paths, no changes any file paths are required upon cloning this repository.
 
@@ -16,13 +16,14 @@ All files involved in generating figures and data used in this study.
      * [GE_IC_color.R](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/GE_IC_color.R) - Sub-script for creating color palettes for plots
      * [GE_IC_clarence_colors.xlsx](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/GE_IC_clarence_colors.xlsx) Color palettes for plots
      
-### [Metabarcoding](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/tree/main/R_ice_camp/metadata) 
-Metabarcoding data generated from Green Edge Ice Camp Campaign (datasets 21, 22 and 23)
+### [Metabarcoding](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/tree/main/R_ice_camp/metabarcoding) 
+Metabarcoding data generated from Green Edge Ice Camp Campaign (datasets 21, 22 downloaded from metaPR2 with PR2 5.0 annotation)
 This study only involves dataset 21 - the filtered DNA samples, excluding light stress experiments.
-* [GE_IC_phyloseq_datasets_21_22_23.rds](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/metabarcoding/GE_IC_phyloseq_datasets_21_22_23.rds) - Phyloseq file for the GE_IC campaign
-* [GE_IC_TAXONtable_datasets_21_22_23.xlsx](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/metabarcoding/GE_IC_TAXONtable_datasets_21_22_23.xlsx) - ASVs from the GE_IC campaign Information includes dada2 assignTaxonomy bootstrap values
-* [GE_IC_SAMPLEtable_datasets_21_22_23.xlsx](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/metabarcoding/GE_IC_SAMPLEtable_datasets_21_22_23.xlsx) - Sample metadata table that reflects all samples in GE_IC
-* [GE_IC_OTUtable_datasets_21_22_23.xlsx](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/metabarcoding/GE_IC_OTUtable_datasets_21_22_23.xlsx) - ASV occurrence across all GE_IC samples
+* [bootstrap_cleaning.R](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/metabarcoding/bootstrap_cleaning.R) - Code to process ASV table with dada2 assignTaxonomy boostrap values. This ensures taxa are only confidently assigned at taxonomic levels with >= 80% boostrap values. 
+* [phyloseq.rds](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/metabarcoding/phyloseq.rds) - Phyloseq file for the GE_IC campaign
+* [samples.xlsx](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/metabarcoding/samples.xlsx) - Sample metadata table that reflects all samples in GE_IC
+* [asv.xlsx](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/metabarcoding/asv.xlsx) - ASV occurrence across all GE_IC samples
+* [asv_cleaned.xlsx](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/metabarcoding/asv_cleaned.xlsx) - ASV occurrence across all GE_IC samples after bootstrap cleaning.
  
 ### [Metadata](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/tree/main/R_ice_camp/metadata) 
 Environmental parameters corresponding to this study's metabarcoding samples
@@ -35,9 +36,7 @@ Environmental parameters corresponding to this study's metabarcoding samples
 Data and scripts used to assign all PR2 taxa with a trophic mode
 * [schneider2020.csv](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/trophic_mode_assignment/SchneiderMajorityRules.csv) - databse of trophic mode assigned to taxa. Retrieved from Schneider et al. (2020) doi: 10.3897/bdj.8.e56648
 * [GE_IC_schneider_majority_rule.R](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/trophic_mode_assignment/GE_IC_schneider_majority_rule.R) - script to generate SchneiderMajorityRules.csv
-* [pr2_taxonomy_4.14.0.xlsx](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/trophic_mode_assignment/pr2_taxonomy_4.14.0.xlsx) - PR2 taxonomy list retrieved from Guillou et al. (2013). doi: 10.1093/nar/gks1160
 * [trophic_mode_updated.xlsx](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/trophic_mode_assignment/trophic_mode_updated.xlsx) - Manually curated trophic mode assignment, including data from SchneiderMajorityRules.csv
-* [trophic_mode.R](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/trophic_mode_assignment/trophic_mode.R) - script to assign every PR2 taxa, at the lowest possible taxonomic level ("taxon_level), a trophic mode to generate [pr2_trophic.xlsx](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/R_ice_camp/trophic_mode_assignment/pr2_trophic.xlsx)
 
 ### [Biogeography assignment](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/tree/main/R_ice_camp/biogeoraphy_assignment_metaPR2)
 Files and script used to assign biogeographical distribution to cASVs.
@@ -57,7 +56,7 @@ Files and script used to assign biogeographical distribution to cASVs.
 * [All supplementary figures](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/tree/main/supplementary_figures) generated from main script (GE_IC_main.Rmd) and biogeography script (GE_IC_biogeo.Rmd)
 
 ## Supplementary Tables
-* [Tables of information](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/tree/main/supplementary_tables) of only the 465 Ice Camp photosynthetic ASVs used in this paper
+* [Tables of information](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/tree/main/supplementary_tables) of only the 504 Ice Camp photosynthetic (phototrophs + mixotrophs) ASVs used in this paper
     * [GE_IC_indicspecies.xlsx](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/supplementary_tables/GE_IC_indicspecies.xlsx) - IndicSpecies values of ASVs (tabs show the various statistical analysis done for comparing groups)
     * [photosynthetic_ASVs_BIOGEOtable.csv](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/supplementary_tables/photosynthetic_ASVs_BIOGEOtable.csv) - Successful biogeographical assignment of 141 ASVs based on metaPR2 samples
     * [photosynthetic_ASVs_OTUtable.csv](https://github.com/clarencesimple/SIM_GreenEdge_IceCamp/blob/main/supplementary_tables/photosynthetic_ASVs_OTUtable.csv) - ASV occurrence across 137 samples
