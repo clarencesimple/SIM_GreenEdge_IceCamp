@@ -30,4 +30,4 @@ library(vegan)
 library(xtable) 
 
 # load PS file and removing non-protist
-ps <- readRDS("../R_Ice_camp/metabarcoding/metapr2_phyloseq_Eukaryota_2023-10-16.rds")
+ps <- readRDS("../R_Ice_camp/metabarcoding/phyloseq.rds")

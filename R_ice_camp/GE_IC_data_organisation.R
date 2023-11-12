@@ -6,7 +6,7 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 ###############
 
 # all samples from GE campaign (ice camp and amundsen)
-sample_metadata <- read_excel("../R_ice_camp/metabarcoding/samples_metadata.xlsx") 
+sample_metadata <- read_excel("../R_ice_camp/metabarcoding/samples.xlsx") 
 
 # Taking only samples involved in GE Ice Camp
 samples <- data.frame(sample_data(ps)) %>%
