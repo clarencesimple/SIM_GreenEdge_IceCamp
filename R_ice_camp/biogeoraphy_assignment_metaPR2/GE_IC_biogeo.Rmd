@@ -241,10 +241,10 @@ distribution_filtered <- distribution_filtered %>%
   select(casv_code,latitude,longitude,biogeo) %>%
   left_join(count,by="biogeo") %>%
   mutate(biogeo_label=str_c(biogeo,"\n (N = ",n,")")) %>%
-  mutate(biogeo_label=factor(biogeo_label,levels=c("Cosmopolitan\n (N = 22)",
-                                                   "Temperate\n (N = 8)",
-                                                   "Polar-Temperate\n (N = 94)",
-                                                   "Polar\n (N = 136)")))
+  mutate(biogeo_label=factor(biogeo_label,levels=c("Cosmopolitan\n (N = 11)",
+                                                   "Temperate\n (N = 6)",
+                                                   "Polar-Temperate\n (N = 68)",
+                                                   "Polar\n (N = 115)")))
 
 
 density <- ggplot(distribution_filtered, aes(x = latitude, y = biogeo_label)) +

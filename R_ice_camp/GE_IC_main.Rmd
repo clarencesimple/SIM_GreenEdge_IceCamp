@@ -32,7 +32,7 @@ ps <- ps %>% subset_samples(is.na(experiment_name) &
                                  fraction_name %in% c("pico","nano","micro") &
                                  DNA_RNA=="DNA") %>%
   subset_taxa(!confident_boot %in% c("domain","supergroup")) %>%#more very ambiguous ASVs 
-  subset_taxa(!(division %in% c("Rhodophyta")) &
+  subset_taxa(!(division %in% c("Rhodophyta","Alveolata","Rhizaria")) &
                 !(subdivision %in% c("Metazoa", "Fungi","Rhodophyta","Stramenopiles_X")) & 
                 !(class %in% c("Phaeophyceae","Embryophyceae","Opisthokonta_XX")) &
                 !(order %in% c("Bryopsidales","Ulotrichales","Dasycladales","Trentepohliales","Cladophorales"))) 
@@ -536,10 +536,10 @@ indic_phyto_water <- left_join(indic_phyto_water, taxa, by="asv_code")
 indic_phyto_water$substrate <- "water"
 indic_phyto_water <- left_join(indic_phyto_water, indic_substrate, by=c("asv_code","substrate"))
 
-indic_substrate_top<-rbind(indic_phyto_ice[1:25,],indic_phyto_water[1:25,])
-# How much of the reads do the top 25 ASVs represent in their respective groupings
-sum(indic_phyto_ice$total_reads[1:25])/sum(indic_phyto_ice$total_reads)
-sum(indic_phyto_water$total_reads[1:25])/sum(indic_phyto_water$total_reads)
+indic_substrate_top<-rbind(indic_phyto_ice[1:20,],indic_phyto_water[1:20,])
+# How much of the reads do the top 20 ASVs represent in their respective groupings
+sum(indic_phyto_ice$total_reads[1:20])/sum(indic_phyto_ice$total_reads)
+sum(indic_phyto_water$total_reads[1:20])/sum(indic_phyto_water$total_reads)
 
 indic_substrate_top$species<-gsub("_"," ",indic_substrate_top$species)
 
@@ -566,7 +566,7 @@ indic_substrate_plot <- lollipop_chart(indic_substrate_top,asv_code,total_reads,
 
 indic_substrate_plot
 
-pdf("../main_figures/indicatorASV_substrate.pdf", height=22, width=24); plot(indic_substrate_plot); dev.off() 
+pdf("../main_figures/indicatorASV_substrate.pdf", height=20, width=24); plot(indic_substrate_plot); dev.off() 
 ```
 
 # Indicator Species (bloom_cluster) and biogeo
@@ -593,10 +593,10 @@ indic_phyto_Stages_II_and_III <- left_join(indic_phyto_Stages_II_and_III, taxa, 
 indic_phyto_Stages_II_and_III$bloom_cluster <- "Stages_II_and_III"
 indic_phyto_Stages_II_and_III <- left_join(indic_phyto_Stages_II_and_III, indic_bloom_cluster, by=c("asv_code","bloom_cluster"))
 
-indic_bloom_cluster_top<-rbind(indic_phyto_Stage_I[1:25,],indic_phyto_Stages_II_and_III[1:25,])
-# How much of the reads do the top 25 ASVs represent in their respective groupings
-sum(indic_phyto_Stage_I$total_reads[1:25])/sum(indic_phyto_ice$total_reads)
-sum(indic_phyto_Stages_II_and_III$total_reads[1:25])/sum(indic_phyto_water$total_reads)
+indic_bloom_cluster_top<-rbind(indic_phyto_Stage_I[1:20,],indic_phyto_Stages_II_and_III[1:20,])
+# How much of the reads do the top 20 ASVs represent in their respective groupings
+sum(indic_phyto_Stage_I$total_reads[1:20])/sum(indic_phyto_ice$total_reads)
+sum(indic_phyto_Stages_II_and_III$total_reads[1:20])/sum(indic_phyto_water$total_reads)
 
 indic_bloom_cluster_top$species<-gsub("_"," ",indic_bloom_cluster_top$species)
 
@@ -624,7 +624,7 @@ indic_bloom_cluster_plot<-lollipop_chart(indic_bloom_cluster_top,asv_code,total_
 
 indic_bloom_cluster_plot
 
-pdf("../main_figures/indicatorASV_bloom_cluster.pdf", height=22, width=24); plot(indic_bloom_cluster_plot); dev.off() 
+pdf("../main_figures/indicatorASV_bloom_cluster.pdf", height=20, width=24); plot(indic_bloom_cluster_plot); dev.off() 
 
 ```
 
@@ -659,7 +659,7 @@ label <- phyto_colors %>% select(species, label)
 
 #to create labels to label species that has at least 20% of reads
 labels <- plot_phyto %>% 
-  filter(n_reads>=0.20*normalised_reads) %>% 
+  filter(n_reads>=0.10*normalised_reads) %>% 
   left_join(label,by="species") %>%
   select(sample_name,species,date,depth_level,fraction_name,label)
 
@@ -670,8 +670,8 @@ plot_phyto <- plot_phyto %>%
 plot_phyto <- left_join(plot_phyto,labels,by=c("sample_name","species","date","depth_level","fraction_name"))
 
 #black and white labels generated separately
-plot_phyto$label_white <- ifelse(plot_phyto$label %in% c("Sc","Ol","Mp","P1","P2","P3","C3","C4","C5"), plot_phyto$label, NA)
-plot_phyto$label_black <- ifelse(plot_phyto$label %in% c("Pr","Bf","Pa","Pp","P4","P5","P6","P7","P8","C1","C2"), plot_phyto$label, NA)
+plot_phyto$label_white <- ifelse(plot_phyto$label %in% c("Cr","Pp","P1","P2","P3","P4","C4","C5","C6"), plot_phyto$label, NA)
+plot_phyto$label_black <- ifelse(plot_phyto$label %in% c("Mp","Bf","Pa","P5","P6","P7","P8","P9","C1","C2","C3"), plot_phyto$label, NA)
 
 #reorganising the data to plot nicely
 plot_phyto$species <- factor(plot_phyto$species,levels=phyto_colors$species)
@@ -745,7 +745,7 @@ culture <- left_join(asv_div,asv_blast_div,by="division") %>%
 culture_plot <- ggplot(culture,aes(x=count,y=reorder(division,(n)),fill=matches)) +
   geom_bar(position="fill",stat="identity",width=0.8,color="black") +
   theme_bw() +
-  theme(text=element_text(size=20),
+  theme(text=element_text(size=18),
         axis.title.x=element_blank(),
         axis.title.y=element_blank(),
         legend.spacing.y=unit(1,'cm'), 
