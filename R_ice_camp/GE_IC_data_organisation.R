@@ -172,6 +172,13 @@ taxa <- taxa %>%
   left_join(blast,by="asv_code") %>%
   replace(is.na(.), 0)
 
+#Exporting as supplementary material 
+blast_supplementary<-read_tsv("../R_ice_camp/biogeoraphy_assignment_metaPR2/metapr2_usearch_all_cultures.tsv.gz") %>% 
+  filter(pct_id==100) %>%
+  group_by(hash_value) %>%
+  rename(asv_code=hash_value)
+blast_supplementary$asv_code<-substr(blast_supplementary$asv_code,1,10)
+
 
 ####################################################
 ### TAXA Manual curation of ASVs from NCBI BLAST ###
@@ -183,6 +190,7 @@ taxa$order[i] <- "Pyrenomonadales"
 taxa$family[i] <- "Baffinellaceae"
 taxa$genus[i] <- "Baffinella"
 taxa$species[i] <- "Baffinella_frigidus"
+taxa$confident_boot[i] <- "Blast_verification"
 
 i <- which(taxa$asv_code==("f8124a0c4a"))
 
@@ -191,6 +199,19 @@ taxa$order[i] <- "Pyrenomonadales"
 taxa$family[i] <- "Baffinellaceae"
 taxa$genus[i] <- "Baffinella"
 taxa$species[i] <- "Baffinella_frigidus"
+taxa$confident_boot[i] <- "Blast_verification"
+
+i <- which(taxa$asv_code==("e297dcca19"))
+taxa$species[i] <- "Attheya_septentrionalis"
+taxa$confident_boot[i] <- "Blast_verification"
+
+i <- which(taxa$asv_code==("6aa05b1319"))
+taxa$species[i] <- "Attheya_septentrionalis"
+taxa$confident_boot[i] <- "Blast_verification"
+
+i <- which(taxa$asv_code==("2976201d4c"))
+taxa$species[i] <- "Thalassiosira_aestivalis"
+taxa$confident_boot[i] <- "Blast_verification"
 
 #KY980391.1
 i <- which(taxa$asv_code==("3105a2354e"))
@@ -198,6 +219,7 @@ taxa$trophic_mode[i] <- "mixotrophic"
 taxa$family[i] <- "Strombidiidae"
 taxa$genus[i] <- "Strombidium"
 taxa$species[i] <- "Strombidium_caudispina"
+taxa$confident_boot[i] <- "Blast_verification"
 
 #KY980391.1 100% match
 i <- which(taxa$asv_code==("7c17a19c86"))
@@ -205,6 +227,7 @@ taxa$trophic_mode[i] <- "mixotrophic"
 taxa$family[i] <- "Strombidiidae"
 taxa$genus[i] <- "Strombidium"
 taxa$species[i] <- "Strombidium_caudispina"
+taxa$confident_boot[i] <- "Blast_verification"
 
 
 #########################
