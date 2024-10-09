@@ -4,7 +4,8 @@ author: "Clarence W H Sim"
 output: pdf_document
 ---
 
-# Load various R files (Must be in this order)
+# Data organisation
+## Load various R files (Must be in this order)
 
 ```{r, echo=FALSE}
 #Set working directory using relative file path
@@ -24,7 +25,7 @@ source("../R_ice_camp/GE_IC_functions.R")
 
 ```
 
-# Retrieve only the time series (TS) samples from the phyloseq file
+## Retrieve only the time series (TS) samples from the phyloseq file
 
 ```{r, message=FALSE }
 ps <- ps %>% subset_samples(is.na(experiment_name) & 
@@ -57,7 +58,7 @@ long <- filter(long,is.na(fraction_name)=="FALSE") # normalization removed ASVs 
 
 ```
 
-# Arranging the water and ice depths, and size fractions
+## Arranging the water and ice depths, and size fractions
 
 ```{r fig.height=10, fig.width=18}
 long$fraction_name<-factor(long$fraction_name, levels=c("pico", "nano", "micro"))
@@ -66,7 +67,8 @@ long$depth_level<-factor(long$depth_level, levels=c("ICE_1","ICE_0", "WATER_1","
 long$date <- lubridate::ymd(long$date)
 ```
 
-# ice and snow plots
+# Environmental variables
+## ice and snow plots
 
 ```{r fig.height=10, fig.width=18}
 ice_thickness <- read_excel("../R_ice_camp/metadata/metadata_icesnow.xlsx", skip=2)
@@ -147,7 +149,7 @@ plot_depth
 
 ```
 
-#plot underwater PAR
+## PAR
 
 ```{r fig.height=6, fig.width=10}
 depth_sampled <-  c(1.5, 5, 10, 20, 30, 40, 60)
@@ -187,7 +189,7 @@ par_plot
 
 ```
 
-#CHLA pigments
+## CHLA pigments
 
 ```{r fig.height=10, fig.width=18}
 
@@ -254,7 +256,7 @@ chla_plot_massicotte
 
 ```
 
-#Flow cyto pico nano
+## Flow cyto pico nano
 
 ```{r fig.height=10, fig.width=18}
   
@@ -302,13 +304,14 @@ fcm_plot <- ggplot(fcm,aes(x = date, y = pico_nano_ml, color=sample_type)) +
 fcm_plot
 ```
 
-# All together
+## All together
 
 ```{r fig.height=10, fig.width=18}
 pdf("../main_figures/environmental_parameters.pdf", height=20, width=22); plot(par_plot/chla_plot_massicotte/fcm_plot/plot_ice_snow/plot_depth); dev.off() 
 ```
 
-#change back to categorical for plotting
+# Metabarcoding community
+## change back to categorical for plotting
 
 ```{r fig.height=10, fig.width=18}
 sampling_dates<-c("2016-05-09","2016-05-23","2016-05-30","2016-06-06","2016-06-13","2016-06-20","2016-06-27","2016-07-06","2016-07-18")
@@ -322,7 +325,7 @@ long$date<-str_replace(long$date,"2016-07-","Jul ")
 long$date <- factor(long$date, levels=sampling_dates_plot)
 ```
 
-# Ordination Plot to check for clustering of samples
+## Ordination Plot to check for clustering of samples
 
 ```{r fig.height=8, fig.width=14}
 
@@ -369,7 +372,15 @@ pdf("../main_figures/nmds.pdf", height=12, width=20); plot(p_nmds); dev.off()
 
 ```
 
-# Plot Main trophic mode across all ice and water using long_IC (includes all non-photosynthetic taxa)
+## Rarefaction curve 
+
+```{r fig.height=5, fig.width=9}
+ps_TS_merge <- merge_samples(ps_TS,"substrate")
+
+rarefied_curve <- rarecurve(data.frame(otu_table(ps_TS_merge)), step=100, cex=1.5, xlab="No. of reads", ylab="No. of ASVs")
+```
+
+## Plot Main trophic mode across all ice and water using long_IC (includes all non-photosynthetic taxa)
 
 ```{r fig.height=10, fig.width=16}
 
@@ -415,8 +426,8 @@ mixo_sum <- long_IC_trophic %>% filter(trophic_mode=="mixotrophic")
 sum(mixo_sum$n_reads)/sum(long_IC_trophic$n_reads)*100
 
 ```
-
-# Plot Biogeo across all samples
+# Biogeography
+## Plot Biogeo across all samples
 
 ```{r fig.height=10, fig.width=16}
 
@@ -431,7 +442,12 @@ unique(long_biogeo$biogeo)
 long_biogeo$biogeo<-factor(long_biogeo$biogeo, levels=biogeoLevels)
 
 unallocated<-long_biogeo %>% filter(biogeo=="Unallocated") 
+
+# how much reads are from ASVs that are unallocated
 sum(unallocated$n_reads)/sum(long_biogeo$n_reads)
+# count how many ASVs were unallocated
+taxa_unallocated <- long %>% filter(biogeo=="Unallocated") 
+length(unique(taxa_unallocated$asv_code))
 
 p_biogeo <- ggplot(long_biogeo, aes(x=date, y=n_reads, fill=biogeo)) + 
   geom_bar(position="fill", stat="identity",color="black",size=0.3) + 
@@ -456,7 +472,7 @@ p_biogeo
 pdf("../supplementary_figures/supplementary_biogeo_photosynthetic.pdf", height=16, width=20); plot(p_biogeo); dev.off() 
 ```
 
-# Make table of photosynthetic ASV properties and assignment
+## Make table of photosynthetic ASV properties and assignment
 
 ```{r}
 ASVs <- (unique(long$asv_code))
@@ -465,11 +481,16 @@ taxa_DNA <- taxa %>%
   filter(trophic_mode %in% c("photosynthetic","mixotrophic"))
 ```
 
-# Tree map
+## Tree map
 
 ```{r fig.height=6, fig.width=6}
 long_phyto_ice<-subset(long,substrate=="ice")
 long_phyto_water<-subset(long,substrate=="water")
+
+#count classes in ice and water
+unique(long_phyto_ice$class)
+unique(long_phyto_water$class)
+unique(long$genus)
 
 tree_phyto_ice <- phyloseq_long_treemap(long_phyto_ice,division,class,"A) Ice community")
 tree_phyto_water <- phyloseq_long_treemap(long_phyto_water,division,class,"B) Water community")
@@ -477,9 +498,8 @@ tree_phyto_water <- phyloseq_long_treemap(long_phyto_water,division,class,"B) Wa
 pdf("../supplementary_figures/community.pdf", height=10, width=18); plot(tree_phyto_ice+tree_phyto_water); dev.off() 
 ```
 
-
-# Indicator ASV between substrates
-# results saved in GE_IC_indicspecies.xlsx
+# Indicator ASV
+## between substrates
 
 ```{r fig.height=6, fig.width=16}
 
@@ -490,12 +510,12 @@ pdf("../supplementary_figures/community.pdf", height=10, width=18); plot(tree_ph
 #inv <- multipatt(abund, substrate, func="IndVal.g",control=how(nperm=9999))
 #summary(inv, indvalcomp = TRUE)
 #options(max.print=1000)
-#The above data was manually converted into csv and excel
+#The above data was manually converted into csv and excel 
 
+# results saved in GE_IC_indicspecies.xlsx
 ```
 
-# Indicator ASV between stage clusters
-# results saved in GE_IC_indicspecies.xlsx
+## between stage clusters
 
 ```{r fig.height=6, fig.width=16}
 
@@ -506,10 +526,11 @@ pdf("../supplementary_figures/community.pdf", height=10, width=18); plot(tree_ph
 #summary(inv, indvalcomp = TRUE)
 #The above data was manually converted into csv and excel
 
+# results saved in GE_IC_indicspecies.xlsx
 ```
 
 
-# Indicator Species (substrate) and biogeo
+## Indicator Species (substrate) and biogeo
 
 ```{r fig.height=16, fig.width=16}
 
@@ -570,7 +591,7 @@ indic_substrate_plot
 pdf("../main_figures/indicatorASV_substrate.pdf", height=18, width=24); plot(indic_substrate_plot); dev.off() 
 ```
 
-# Indicator Species (bloom_cluster) and biogeo
+## Indicator Species (bloom_cluster) and biogeo
 
 ```{r fig.height=16, fig.width=16}
 indic_bloom_cluster <- read_excel("../supplementary_tables/GE_IC_indicspecies.xlsx", sheet="bloom_cluster")
@@ -630,7 +651,7 @@ pdf("../main_figures/indicatorASV_bloom_cluster.pdf", height=18, width=24); plot
 
 ```
 
-# Species Level
+# Metabarcoding - Species Level 
 
 ```{r fig.height=16, fig.width=16}
 
